@@ -28,6 +28,8 @@ import net.mc_cubed.icedjava.util.ExpiringCache;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.DatagramPacket;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -59,9 +61,16 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunPack
     protected Logger log = Logger.getLogger(getClass().getName());
     ExpiringCache<BigInteger, StunReplyFuture> requestCache = new ExpiringCache<BigInteger, StunReplyFuture>();
     protected StunListener stunListener;
-    private static final int MAX_PACKET_LENGTH = 2048;
-    private static final int RETRY_NUM = 4;
-    private static final int WAIT_TIME = 500;
+    /**
+     * RFC 5389 7.1:
+     * All STUN messages sent over UDP SHOULD be less than the path MTU if known.
+     * If the path MTU is unknown, messages SHOULD be the smaller of 576 and the
+     * first-hop MTU for IPv4 and 1280 bytes for IPv6.
+     */
+    private int ip4MaxLength = 548;  // IP4 header = 28 bytes
+    private int ip6MaxLength = 1232; // IP6 header = 48 bytes fixed
+    private int maxRetries = 7; // RFC 5389 7.2.1:  Rc
+    private int initialTimeout = 500; // RFC 5389 7.2.1: RTO
     protected Channel channel;
 
     protected DatagramStunSocket(StunListenerType type) throws SocketException {
@@ -83,6 +92,22 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunPack
 
     @Override
     public ChannelFuture send(SocketAddress remoteSocket, StunPacket packet) throws IOException {
+        /**
+         * RFC 5389 7.1:
+         * All STUN messages sent over UDP SHOULD be less than the path MTU, if
+         * known. If the path MTU is unknown, messages SHOULD be the smaller of
+         * 576 bytes and the first-hop MTU for IPv4 and 1280 bytes for IPv6
+         */
+        if (((InetSocketAddress) remoteSocket).getAddress() instanceof Inet4Address) {
+            if (packet.getBytes().length > ip4MaxLength) {
+                throw new OversizeStunPacketException(remoteSocket, packet);
+            }
+        } else if (((InetSocketAddress) remoteSocket).getAddress() instanceof Inet6Address) {
+            if (packet.getBytes().length > ip6MaxLength) {
+                throw new OversizeStunPacketException(remoteSocket, packet);
+            }
+
+        }
         return channel.write(packet, remoteSocket);
     }
 
@@ -107,6 +132,7 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunPack
     public Future<StunReply> doTest(final InetAddress server, final int port, final StunPacket request) throws InterruptedException, IOException {
         log.log(Level.FINER, "Sending: {0}", request);
 
+
         final StunReplyFuture replyFuture = new StunReplyFuture(new InetSocketAddress(server, port));
         requestCache.admit(request.getId(), replyFuture);
 
@@ -115,21 +141,45 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunPack
             @Override
             public void run() {
                 try {
-                    for (int i = 0; i < RETRY_NUM; i++) {
+                    /**
+                     * RFC 5389 7.2.1:
+                     * Retransmissions continue until a response is received, or
+                     * until a total of Rc requests have been sent. Rc SHOULD be
+                     * configurable and SHOULD have a default of 7. If, after
+                     * the last request, a duration equal to Rm times the RTO
+                     * has passed without a response (providing ample time to
+                     * get a response if only this final request actually
+                     * succeeds), the client SHOULD consider the transaction to
+                     * have failed.
+                     */
+                    for (int i = 0; i < maxRetries; i++) {
                         send(server, port, request);
 
-                        if (replyFuture.get(WAIT_TIME, TimeUnit.MILLISECONDS) != null) {
+                        /**
+                         * RFC 5389 7.2.1:
+                         * A client SHOULD retransmit a STUN request message
+                         * starting with an interval of RTO ("Retransmission TimeOut"),
+                         * doubling after each retransmission. The RTO is an
+                         * estimate of the round-trip time (RTT) and is computed
+                         * as described in RFC 2988
+                         */
+                        int timeout = (int) Math.round(initialTimeout * Math.pow(2, i));
+                        if (replyFuture.get(timeout, TimeUnit.MILLISECONDS) != null) {
                             break;
                         }
                     }
                 } catch (InterruptedException ex) {
                     Logger.getLogger(DatagramStunSocket.class.getName()).log(Level.SEVERE, null, ex);
+                    replyFuture.setReply(new StunReplyImpl(ex));
                 } catch (ExecutionException ex) {
                     Logger.getLogger(DatagramStunSocket.class.getName()).log(Level.SEVERE, null, ex);
+                    replyFuture.setReply(new StunReplyImpl(ex));
                 } catch (TimeoutException ex) {
                     Logger.getLogger(DatagramStunSocket.class.getName()).log(Level.SEVERE, null, ex);
+                    replyFuture.setReply(new StunReplyImpl(ex));
                 } catch (IOException ex) {
                     Logger.getLogger(DatagramStunSocket.class.getName()).log(Level.SEVERE, null, ex);
+                    replyFuture.setReply(new StunReplyImpl(ex));
                 } finally {
                     if (!replyFuture.isDone()) {
                         replyFuture.cancel(true);
@@ -174,7 +224,7 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunPack
 
             //super.receive(p);
             if (e.getMessage() instanceof StunPacket) {
-                stunListener.processPacket((StunPacket)e.getMessage(),e.getRemoteAddress());
+                stunListener.processPacket((StunPacket) e.getMessage(), e.getRemoteAddress());
             } else if (e.getMessage() instanceof ChannelBuffer) {
                 ChannelBuffer buf = (ChannelBuffer) e.getMessage();
                 InetSocketAddress remoteAddr = (InetSocketAddress) e.getRemoteAddress();
@@ -280,5 +330,21 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunPack
             this.stunReply = reply;
             notifyAll();
         }
+    }
+
+    public int getInitialTimeout() {
+        return initialTimeout;
+    }
+
+    public void setInitialTimeout(int initialTimeout) {
+        this.initialTimeout = initialTimeout;
+    }
+
+    public int getMaxRetries() {
+        return maxRetries;
+    }
+
+    public void setMaxRetries(int maxRetries) {
+        this.maxRetries = maxRetries;
     }
 }
