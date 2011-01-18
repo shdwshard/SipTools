@@ -68,12 +68,12 @@ import net.mc_cubed.icedjava.packet.attribute.AttributeFactory;
 import net.mc_cubed.icedjava.packet.attribute.AttributeType;
 import net.mc_cubed.icedjava.packet.attribute.ErrorCodeAttribute;
 import net.mc_cubed.icedjava.packet.attribute.FingerprintAttribute;
-import net.mc_cubed.icedjava.packet.attribute.IntegerAttribute;
+import net.mc_cubed.icedjava.packet.attribute.IceControlledAttribute;
+import net.mc_cubed.icedjava.packet.attribute.IceControllingAttribute;
 import net.mc_cubed.icedjava.packet.attribute.IntegrityAttribute;
-import net.mc_cubed.icedjava.packet.attribute.LongAttribute;
 import net.mc_cubed.icedjava.packet.attribute.NullAttribute;
 import net.mc_cubed.icedjava.packet.attribute.RealmAttribute;
-import net.mc_cubed.icedjava.packet.attribute.StringAttribute;
+import net.mc_cubed.icedjava.packet.attribute.UsernameAttribute;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageHeader;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
@@ -158,7 +158,7 @@ abstract class IceStateMachine implements Runnable, SDPListener,
                     + "supported for the controlling agent!");
         }
         this.nomination = nomination;
-        
+
         if (getStatus() != IceStatus.NOT_STARTED) {
             doReset(this.isLocalControlled());
         }
@@ -290,6 +290,7 @@ abstract class IceStateMachine implements Runnable, SDPListener,
     @Override
     public void run() {
         this.getThreadpool().execute(new Runnable() {
+
             @Override
             public void run() {
                 _run();
@@ -462,7 +463,7 @@ abstract class IceStateMachine implements Runnable, SDPListener,
                     for (List<CandidatePair> pairList : nominated.values()) {
                         for (CandidatePair pair : pairList) {
                             /**
-                             * TODO: Repeat connectivity checks at a regular interval on
+                             * Repeat connectivity checks at a regular interval on
                              * nominated candidates to keep the candidates available
                              */
                             IceReply result = doIceTest(
@@ -535,10 +536,12 @@ abstract class IceStateMachine implements Runnable, SDPListener,
                             checkPairs.get(socket).add(peerReflexPair);
                         } else {
                             // Unfreeze other pairs with the same foundation
-                            for (CandidatePair candidate : checkPairs.get(socket)) {
-                                if (candidate.getFoundation().compareTo(pair.getFoundation()) == 0
-                                        && candidate.getState() == PairState.FROZEN) {
-                                    candidate.setState(PairState.WAITING);
+                            for (IceSocket updateSocket : checkPairs.keySet()) {
+                                for (CandidatePair candidate : checkPairs.get(updateSocket)) {
+                                    if (candidate.getFoundation().compareTo(pair.getFoundation()) == 0
+                                            && candidate.getState() == PairState.FROZEN) {
+                                        candidate.setState(PairState.WAITING);
+                                    }
                                 }
                             }
 
@@ -564,10 +567,10 @@ abstract class IceStateMachine implements Runnable, SDPListener,
                         if (result.getErrorCode() == ROLE_CONFLICT) {
                             long remoteTieBreaker;
                             if (result.getAttribute(AttributeType.ICE_CONTROLLED) != null) {
-                                LongAttribute remote = (LongAttribute) result.getAttribute(AttributeType.ICE_CONTROLLED);
+                                IceControlledAttribute remote = (IceControlledAttribute) result.getAttribute(AttributeType.ICE_CONTROLLED);
                                 remoteTieBreaker = remote.getNumber();
                             } else {
-                                LongAttribute remote = (LongAttribute) result.getAttribute(AttributeType.ICE_CONTROLLING);
+                                IceControllingAttribute remote = (IceControllingAttribute) result.getAttribute(AttributeType.ICE_CONTROLLING);
                                 remoteTieBreaker = remote.getNumber();
                             }
 
@@ -581,7 +584,7 @@ abstract class IceStateMachine implements Runnable, SDPListener,
                             }
 
                             setLocalControlled(control);
-                            
+
                             return;
                         }
                         pair.setState(PairState.FAILED);
@@ -673,11 +676,11 @@ abstract class IceStateMachine implements Runnable, SDPListener,
             return false;
         }
 
-        return processPacket(packet,p.getSocketAddress(),source);
+        return processPacket(packet, p.getSocketAddress(), source);
     }
 
     @Override
-    public boolean processPacket(StunPacket packet,SocketAddress sourceAddress, DatagramStunSocket source) {
+    public boolean processPacket(StunPacket packet, SocketAddress sourceAddress, DatagramStunSocket source) {
         Map<AttributeType, net.mc_cubed.icedjava.packet.attribute.Attribute> attrMap =
                 new HashMap<AttributeType, net.mc_cubed.icedjava.packet.attribute.Attribute>();
         // Extract the essential attributes we need
@@ -698,15 +701,15 @@ abstract class IceStateMachine implements Runnable, SDPListener,
             }
         }
         // Isolate which peer by the Username parameter
-        StringAttribute userAttribute =
-                (StringAttribute) attrMap.get(AttributeType.USERNAME);
+        UsernameAttribute userAttribute =
+                (UsernameAttribute) attrMap.get(AttributeType.USERNAME);
         RealmAttribute realmAttribute =
                 (RealmAttribute) attrMap.get(AttributeType.REALM);
         if (userAttribute == null || realmAttribute == null) {
             // Ordinary STUN request, pass it along
             log.log(Level.FINER, "Received STUN packet {0}", packet);
             GenericStunListener gsl = new GenericStunListener(source, StunListenerType.BOTH);
-            return gsl.processPacket(packet,sourceAddress);
+            return gsl.processPacket(packet, sourceAddress);
         }
 
         log.log(Level.FINEST, "Received ICE packet {0}", packet);
@@ -747,10 +750,10 @@ abstract class IceStateMachine implements Runnable, SDPListener,
         long remoteTieBreaker = 0;
         if (attrMap.containsKey(AttributeType.ICE_CONTROLLING)) {
             localControl = false;
-            remoteTieBreaker = ((LongAttribute) attrMap.get(AttributeType.ICE_CONTROLLING)).getNumber();
+            remoteTieBreaker = ((IceControllingAttribute) attrMap.get(AttributeType.ICE_CONTROLLING)).getNumber();
         } else if (attrMap.containsKey(AttributeType.ICE_CONTROLLED)) {
             localControl = true;
-            remoteTieBreaker = ((LongAttribute) attrMap.get(AttributeType.ICE_CONTROLLED)).getNumber();
+            remoteTieBreaker = ((IceControlledAttribute) attrMap.get(AttributeType.ICE_CONTROLLED)).getNumber();
         }
 
         if (localControl == null) {
@@ -772,18 +775,19 @@ abstract class IceStateMachine implements Runnable, SDPListener,
                 StunPacket response = StunUtil.createReplyPacket(packet, MessageClass.ERROR);
                 response.getAttributes().add(new ErrorCodeAttribute(ROLE_CONFLICT, ROLE_CONFLICT_REASON));
                 if (fromPeer.isLocalControlled()) {
-                    response.getAttributes().add(new LongAttribute(AttributeType.ICE_CONTROLLING, fromPeer.getTieBreaker()));
+                    response.getAttributes().add(AttributeFactory.createIceControllingAttribute(fromPeer.getTieBreaker()));
                 } else {
-                    response.getAttributes().add(new LongAttribute(AttributeType.ICE_CONTROLLED, fromPeer.getTieBreaker()));
+                    response.getAttributes().add(AttributeFactory.createIceControlledAttribute(fromPeer.getTieBreaker()));
                 }
                 // Authentication Attributes
                 if (fromPeer.getRemotePassword() != null && fromPeer.getRemoteUFrag() != null) {
                     String realm = "icedjava";
-                    response.getAttributes().add(new StringAttribute(AttributeType.USERNAME, fromPeer.getRemoteUFrag() + ":" + fromPeer.getLocalUFrag()));
-                    response.getAttributes().add(new StringAttribute(AttributeType.REALM, realm));
-                    response.getAttributes().add(new IntegrityAttribute(fromPeer.getLocalUFrag(), fromPeer.getRemoteUFrag(), realm, fromPeer.getRemotePassword()));
+                    String username = fromPeer.getRemoteUFrag() + ":" + fromPeer.getLocalUFrag();
+                    response.getAttributes().add(AttributeFactory.createUsernameAttribute(username));
+                    response.getAttributes().add(AttributeFactory.createRealmAttribute(realm));
+                    response.getAttributes().add(AttributeFactory.createIntegrityAttribute(username, realm, fromPeer.getRemotePassword()));
                 }
-                response.getAttributes().add(new FingerprintAttribute());
+                response.getAttributes().add(AttributeFactory.createFingerprintAttribute());
                 try {
                     source.send(sourceAddress, response);
                 } catch (IOException ex) {
@@ -814,24 +818,24 @@ abstract class IceStateMachine implements Runnable, SDPListener,
             case REQUEST:
                 StunPacket response = StunUtil.createReplyPacket(packet, MessageClass.SUCCESS);
                 response.getAttributes().add(AttributeFactory.createXORMappedAddressAttribute(
-                        ((InetSocketAddress)sourceAddress).getAddress(),
-                        ((InetSocketAddress)sourceAddress).getPort(),
+                        ((InetSocketAddress) sourceAddress).getAddress(),
+                        ((InetSocketAddress) sourceAddress).getPort(),
                         packet.getTransactionId()));
 
                 if (fromPeer.isLocalControlled()) {
-                    response.getAttributes().add(new LongAttribute(AttributeType.ICE_CONTROLLING, fromPeer.getTieBreaker()));
+                    response.getAttributes().add(AttributeFactory.createIceControllingAttribute(fromPeer.getTieBreaker()));
                 } else {
-                    response.getAttributes().add(new LongAttribute(AttributeType.ICE_CONTROLLED, fromPeer.getTieBreaker()));
+                    response.getAttributes().add(AttributeFactory.createIceControlledAttribute(fromPeer.getTieBreaker()));
                 }
                 // Authentication Attributes
                 if (fromPeer.getRemotePassword() != null && fromPeer.getRemoteUFrag() != null) {
                     String realm = "icedjava";
                     String username = fromPeer.getRemoteUFrag() + ":" + fromPeer.getLocalUFrag();
-                    response.getAttributes().add(new StringAttribute(AttributeType.USERNAME, username));
-                    response.getAttributes().add(new StringAttribute(AttributeType.REALM, realm));
-                    response.getAttributes().add(new IntegrityAttribute(username, realm, fromPeer.getRemotePassword()));
+                    response.getAttributes().add(AttributeFactory.createUsernameAttribute(username));
+                    response.getAttributes().add(AttributeFactory.createRealmAttribute(realm));
+                    response.getAttributes().add(AttributeFactory.createIntegrityAttribute(username, realm, fromPeer.getRemotePassword()));
                 }
-                response.getAttributes().add(new FingerprintAttribute());
+                response.getAttributes().add(AttributeFactory.createFingerprintAttribute());
                 try {
                     source.send(sourceAddress, response);
                 } catch (IOException ex) {
@@ -1443,21 +1447,22 @@ abstract class IceStateMachine implements Runnable, SDPListener,
         try {
             StunPacket stunPacket = StunUtil.createStunRequest(MessageClass.REQUEST, MessageMethod.BINDING);
             // ICE Specific Attributes
-            stunPacket.getAttributes().add(new IntegerAttribute(AttributeType.PRIORITY, peerReflexPriority));
+            stunPacket.getAttributes().add(AttributeFactory.createPriorityAttribute(peerReflexPriority));
             if (controlling) {
-                stunPacket.getAttributes().add(new LongAttribute(AttributeType.ICE_CONTROLLING, tieBreaker));
+                stunPacket.getAttributes().add(AttributeFactory.createIceControllingAttribute(tieBreaker));
             } else {
-                stunPacket.getAttributes().add(new LongAttribute(AttributeType.ICE_CONTROLLED, tieBreaker));
+                stunPacket.getAttributes().add(AttributeFactory.createIceControlledAttribute(tieBreaker));
             }
             if (nominate) {
                 stunPacket.getAttributes().add(new NullAttribute(AttributeType.USE_CANDIDATE));
             }
             // Authentication Attributes
             String realm = "icedjava";
-            stunPacket.getAttributes().add(new StringAttribute(AttributeType.USERNAME, remoteUFrag + ":" + localUFrag));
-            stunPacket.getAttributes().add(new StringAttribute(AttributeType.REALM, realm));
-            stunPacket.getAttributes().add(new IntegrityAttribute(localUFrag, remoteUFrag, realm, remotePassword));
-            stunPacket.getAttributes().add(new FingerprintAttribute());
+            String username = remoteUFrag + ":" + localUFrag;
+            stunPacket.getAttributes().add(AttributeFactory.createUsernameAttribute(username));
+            stunPacket.getAttributes().add(AttributeFactory.createRealmAttribute(realm));
+            stunPacket.getAttributes().add(AttributeFactory.createIntegrityAttribute(username, realm, remotePassword));
+            stunPacket.getAttributes().add(AttributeFactory.createFingerprintAttribute());
             // Stun it
             log.log(Level.FINER, "Ice Test {0} -> {1}", new Object[]{pair.getLocalCandidate().getSocketAddress(), pair.getRemoteCandidate().getSocketAddress()});
             StunReply reply = pair.localCandidate.socket.doTest(pair.getRemoteCandidate().getSocketAddress(), stunPacket).get();

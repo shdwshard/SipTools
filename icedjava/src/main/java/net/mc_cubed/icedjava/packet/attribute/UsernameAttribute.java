@@ -5,16 +5,10 @@
 
 package net.mc_cubed.icedjava.packet.attribute;
 
-import java.net.InetAddress;
-
 /**
  *
  * @author charles
  */
-public interface MappedAddressAttribute extends Attribute {
-
-    InetAddress getAddress();
-
-    int getPort();
-
+public interface UsernameAttribute extends Attribute {
+    public String getValue();
 }

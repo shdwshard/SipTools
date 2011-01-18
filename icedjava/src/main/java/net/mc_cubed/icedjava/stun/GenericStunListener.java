@@ -22,7 +22,6 @@ package net.mc_cubed.icedjava.stun;
 import net.mc_cubed.icedjava.packet.attribute.Attribute;
 import net.mc_cubed.icedjava.packet.attribute.AttributeType;
 import net.mc_cubed.icedjava.packet.attribute.ErrorCodeAttribute;
-import net.mc_cubed.icedjava.packet.attribute.FingerprintAttribute;
 import net.mc_cubed.icedjava.packet.attribute.SoftwareAttribute;
 import net.mc_cubed.icedjava.packet.attribute.UnknownAttributesAttribute;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
@@ -48,7 +47,7 @@ public class GenericStunListener implements StunListener {
 
     StunPacketSender socket;
     StunListenerType type;
-    static SoftwareAttribute mySoftwareAttribute = new SoftwareAttribute(
+    static SoftwareAttribute mySoftwareAttribute = AttributeFactory.createSoftwareAttribute(
             "IcedJava 1.0 Alpha - Copyright MC Cubed, Inc. of Saitama, Japan, released under LGPL v3.0");
 
     public GenericStunListener(StunPacketSender socket, StunListenerType type) {
@@ -119,7 +118,7 @@ public class GenericStunListener implements StunListener {
             StunPacketImpl reply = new StunPacketImpl(MessageClass.ERROR, MessageMethod.BINDING, packet.getTransactionId());
             reply.getAttributes().add(new ErrorCodeAttribute(400, "Not acting as a client"));
             reply.getAttributes().add(mySoftwareAttribute);
-            reply.getAttributes().add(new FingerprintAttribute());
+            reply.getAttributes().add(AttributeFactory.createFingerprintAttribute());
             try {
                 socket.send(senderAddress, reply);
             } catch (IOException ex) {
@@ -134,7 +133,7 @@ public class GenericStunListener implements StunListener {
             StunPacketImpl reply = new StunPacketImpl(MessageClass.ERROR, MessageMethod.BINDING, packet.getTransactionId());
             reply.getAttributes().add(new ErrorCodeAttribute(400, "Unknown method invoked"));
             reply.getAttributes().add(mySoftwareAttribute);
-            reply.getAttributes().add(new FingerprintAttribute());
+            reply.getAttributes().add(AttributeFactory.createFingerprintAttribute());
             try {
                 socket.send(senderAddress, reply);
             } catch (IOException ex) {
@@ -165,7 +164,7 @@ public class GenericStunListener implements StunListener {
                 reply.getAttributes().add(new UnknownAttributesAttribute(unknownAttributes));
             }
             reply.getAttributes().add(mySoftwareAttribute);
-            reply.getAttributes().add(new FingerprintAttribute());
+            reply.getAttributes().add(AttributeFactory.createFingerprintAttribute());
             try {
                 socket.send(senderAddress, reply);
             } catch (IOException ex) {

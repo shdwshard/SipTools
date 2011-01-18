@@ -23,13 +23,6 @@ package net.mc_cubed.icedjava.packet.attribute;
  *
  * @author Charles Chappell
  */
-public class RealmAttribute extends StringAttribute {
-
-    public RealmAttribute(AttributeType type, int length, byte[] value) {
-        super(type, length, value);
-    }
-
-    public RealmAttribute(String value) {
-        super(AttributeType.REALM,value);
-    }
+public interface RealmAttribute extends Attribute {
+    public String getValue();
 }

@@ -38,7 +38,7 @@ import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.mc_cubed.icedjava.packet.StunPacket;
-import net.mc_cubed.icedjava.packet.attribute.FingerprintAttribute;
+import net.mc_cubed.icedjava.packet.attribute.AttributeFactory;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelDownstreamHandler;
@@ -120,7 +120,7 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunPack
 
         // Create the request object
         StunPacketImpl request = new StunPacketImpl(MessageClass.REQUEST, MessageMethod.BINDING);
-        request.getAttributes().add(new FingerprintAttribute());
+        request.getAttributes().add(AttributeFactory.createFingerprintAttribute());
 
         return doTest(server, port, request);
     }

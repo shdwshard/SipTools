@@ -22,8 +22,6 @@ package net.mc_cubed.icedjava.packet.attribute;
 import net.mc_cubed.icedjava.util.NumericUtils;
 import net.mc_cubed.icedjava.util.StringUtils;
 import java.lang.reflect.Constructor;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -31,7 +29,7 @@ import java.util.logging.Logger;
  *
  * @author Charles Chappell
  */
-public class GenericAttribute implements Attribute {
+class GenericAttribute implements Attribute {
 
     static final Class[] CONSTRUCTOR_ARGS = new Class[]{AttributeType.class, int.class, new byte[0].getClass()};
     static final String MD5_ALGORITHM = "MD5";
@@ -58,8 +56,8 @@ public class GenericAttribute implements Attribute {
             Constructor c = attributeClass.getDeclaredConstructor(CONSTRUCTOR_ARGS);
 
             Attribute newAttr = (Attribute) c.newInstance(type, length, data);
-            if (newAttr instanceof HashAttribute) {
-                HashAttribute hashAttr = (HashAttribute) newAttr;
+            if (newAttr instanceof FingerprintAttribute) {
+                FingerprintAttribute hashAttr = (FingerprintAttribute) newAttr;
                 if (hashAttr.verifyHash(packetBytes, start, offset)) {
                     Logger.getAnonymousLogger().log(Level.FINER,
                             "Found {0} attribute and verified it",
@@ -116,8 +114,8 @@ public class GenericAttribute implements Attribute {
     @Override
     final public int write(byte[] data, int off) {
         // If this is a hash attribute, compute the hash now
-        if (HashAttribute.class.isInstance(this)) {
-            HashAttribute hashAttr = (HashAttribute) this;
+        if (FingerprintAttribute.class.isInstance(this)) {
+            FingerprintAttribute hashAttr = (FingerprintAttribute) this;
             hashAttr.computeHash(data, 0, off);
         }
 

@@ -28,8 +28,8 @@ import net.mc_cubed.icedjava.packet.attribute.Attribute;
 import net.mc_cubed.icedjava.packet.attribute.AttributeType;
 import net.mc_cubed.icedjava.packet.attribute.ErrorCodeAttribute;
 import net.mc_cubed.icedjava.packet.attribute.FingerprintAttribute;
-import net.mc_cubed.icedjava.packet.attribute.MappedAddressAttribute;
-import net.mc_cubed.icedjava.packet.attribute.StringAttribute;
+import net.mc_cubed.icedjava.packet.attribute.MappedAddressAttributeImpl;
+import net.mc_cubed.icedjava.packet.attribute.SoftwareAttribute;
 import net.mc_cubed.icedjava.packet.attribute.XORMappedAddressAttribute;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.stun.StunReply;
@@ -58,7 +58,7 @@ class IceReplyImpl implements IceReply,StunReply {
         for (Attribute attr : packet.getAttributes()) {
             attrMap.put(attr.getType(), attr);
             if (attr.getType() == AttributeType.MAPPED_ADDRESS) {
-                MappedAddressAttribute maa = (MappedAddressAttribute) attr;
+                MappedAddressAttributeImpl maa = (MappedAddressAttributeImpl) attr;
                 mappedAddress = new InetSocketAddress(maa.getAddress(), maa.getPort());
             }
             if (attr.getType() == AttributeType.XOR_MAPPED_ADDRESS) {
@@ -119,7 +119,7 @@ class IceReplyImpl implements IceReply,StunReply {
 
     @Override
     public String toString() {
-        return getClass().getName() + "[success=" + success + ((success) ? ":mappedAddress=" + mappedAddress : ":errorCode=" + errorCode + ":errorReason=" + errorReason) + ((attrMap.containsKey(AttributeType.SOFTWARE)) ? ":software=" + ((StringAttribute) attrMap.get(AttributeType.SOFTWARE)).getValue() : "") + ":validFingerprint=" + validFingerprint + "]";
+        return getClass().getName() + "[success=" + success + ((success) ? ":mappedAddress=" + mappedAddress : ":errorCode=" + errorCode + ":errorReason=" + errorReason) + ((attrMap.containsKey(AttributeType.SOFTWARE)) ? ":software=" + ((SoftwareAttribute) attrMap.get(AttributeType.SOFTWARE)).getValue() : "") + ":validFingerprint=" + validFingerprint + "]";
     }
 
     @Override

@@ -19,58 +19,33 @@
  */
 package net.mc_cubed.icedjava.packet.attribute;
 
-import net.mc_cubed.icedjava.util.NumericUtils;
-import java.util.zip.CRC32;
-
 /**
  *
  * @author Charles Chappell
  */
-public class FingerprintAttribute extends GenericAttribute implements HashAttribute {
+public interface FingerprintAttribute extends Attribute {
+    /*
+     * Compute the message hash for use in this attribute.  The credentials MUST
+     *  be delivered via an alternate mechanism
+     * @param data the buffer being used to construct or verify the STUN message
+     * @param offset the offset in the buffer where the stun message starts
+     * @param length the length of the stun packet UP TO BUT NOT INCLUDING the
+     *          attribute the hash is being computed on
+     */
 
-    long crc32Value;
-    boolean valid;
+    public void computeHash(byte[] data, int offset, int length);
+    /*
+     * Verify the message hash used in this attribute
+     * @param data the buffer being used to construct or verify the STUN message
+     * @param offset the offset in the buffer where the stun message starts
+     * @param length the length of the stun packet UP TO BUT NOT INCLUDING the
+     *          attribute the hash is being computed on
+     */
 
-    public FingerprintAttribute(AttributeType type, int length, byte[] value) {
-        super(type, length, value);
-        if (length != 4) {
-            throw new IllegalArgumentException("Not a valid fingerprint attribute");
-        } else {
-            crc32Value = 0x00ffffffffL & NumericUtils.toInt(data);
-        }
+    public boolean verifyHash(byte[] data, int offset, int length);
 
-    }
-
-    protected long computeCRC32(byte[] data, int offset, int length) {
-        CRC32 crc = new CRC32();
-        crc.reset();
-        crc.update(data, offset, length);
-        return crc.getValue() ^ 0x5354554e;
-
-    }
-
-    @Override
-    public void computeHash(byte[] data, int offset, int length) {
-        crc32Value = computeCRC32(data, offset, length);
-        this.data = NumericUtils.toNetworkBytes((int) crc32Value);
-        valid = true;
-    }
-
-    @Override
-    public boolean verifyHash(byte[] data, int offset, int length) {
-        long computedHash = computeCRC32(data, offset, length);
-        valid = computedHash == crc32Value;
-        return valid;
-    }
-
-    public FingerprintAttribute() {
-        this.type = AttributeType.FINGERPRINT;
-        data = new byte[4];
-        length = 4;
-    }
-
-    @Override
-    public boolean isValid() {
-        return valid;
-    }
+    /*
+     * Check the validity of the hash
+     */
+    public boolean isValid();
 }

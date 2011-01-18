@@ -19,43 +19,10 @@
  */
 package net.mc_cubed.icedjava.packet.attribute;
 
-import java.security.SecureRandom;
-
 /**
  *
  * @author Charles Chappell
  */
-public class NonceAttribute extends GenericAttribute {
-
-    final String nonce;
-
-    NonceAttribute() {
-        String nonceGen = "";
-        SecureRandom sr = new SecureRandom();
-        for (int i = 0; i < 16; i++) {
-            Long nextLong = sr.nextLong();
-            nonceGen += Long.toHexString(nextLong);
-        }
-        this.nonce = nonceGen;
-        this.data = nonce.getBytes();
-        this.length = data.length;
-        this.type = AttributeType.NONCE;
-    }
-
-    NonceAttribute(String nonce) {
-        this.nonce = nonce;
-        this.data = nonce.getBytes();
-        this.length = data.length;
-        this.type = AttributeType.NONCE;
-    }
-
-    public NonceAttribute(AttributeType type, int length, byte[] value) {
-        super(type, length, value);
-
-        nonce = new String(data, 0, length);
-    }
-
-    public String getNonce() {
-        return nonce;
-    }
+public interface NonceAttribute extends Attribute {
+    public String getValue();
 }

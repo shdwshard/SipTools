@@ -58,18 +58,20 @@ public class XORMappedAddressAttributeTest extends TestCase {
 
 
         Random rand = new Random();
+        byte[] buffer = new byte[32];
 
         for (InterfaceProfile profile : profiles) {
             InetAddress address = profile.getAddress();
             for (int i = 0; i <= 255; i++) {
                 int portNum = rand.nextInt(65536);
                 byte[] txId = MessageHeader.generateTransactionId();
-                Attribute attr = new XORMappedAddressAttribute(address, portNum, txId);
+                Attribute attr = AttributeFactory.createXORMappedAddressAttribute(address, portNum, txId);
+                attr.write(buffer, 0);
                 log.log(Level.FINE, "xor: {0} {1}",
-                        new Object[]{StringUtils.getHexString(txId), StringUtils.getHexString(attr.getData())});
+                        new Object[]{StringUtils.getHexString(txId), StringUtils.getHexString(buffer)});
 
-                XORMappedAddressAttribute attr2 = new XORMappedAddressAttribute(AttributeType.XOR_MAPPED_ADDRESS, attr.getLength(), attr.getData());
-                Assert.assertEquals(address, attr2.getAddress(txId));
+                XORMappedAddressAttribute attr2 = (XORMappedAddressAttribute)AttributeFactory.processOneAttribute(buffer,0,0);
+                Assert.assertEquals("Address mismatch " + address + " != " + attr2.getAddress(txId),address, attr2.getAddress(txId));
                 Assert.assertEquals("Port number mismatch " + Integer.toHexString(portNum) + " != " + Integer.toHexString(attr2.getPort()),portNum, attr2.getPort());
             }
         }

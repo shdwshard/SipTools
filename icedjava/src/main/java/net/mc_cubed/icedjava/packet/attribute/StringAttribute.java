@@ -23,7 +23,8 @@ package net.mc_cubed.icedjava.packet.attribute;
  *
  * @author Charles Chappell
  */
-public class StringAttribute extends GenericAttribute {
+class StringAttribute extends GenericAttribute implements UsernameAttribute,
+        RealmAttribute, SoftwareAttribute, NonceAttribute {
 
     final String value;
 
@@ -40,6 +41,7 @@ public class StringAttribute extends GenericAttribute {
         this.value = new String(data, 0, length);
     }
 
+    @Override
     public String getValue() {
         return value;
     }

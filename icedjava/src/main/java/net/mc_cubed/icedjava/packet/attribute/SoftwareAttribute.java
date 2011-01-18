@@ -23,13 +23,7 @@ package net.mc_cubed.icedjava.packet.attribute;
  *
  * @author Charles Chappell
  */
-public class SoftwareAttribute extends StringAttribute {
+public interface SoftwareAttribute extends Attribute {
 
-    public SoftwareAttribute(AttributeType type, int length, byte[] value) {
-        super(type, length, value);
-    }
-
-    public SoftwareAttribute(String value) {
-        super(AttributeType.SOFTWARE,value);
-    }
+    public String getValue();
 }

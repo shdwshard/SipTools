@@ -24,9 +24,9 @@ import net.mc_cubed.icedjava.util.StringUtils;
 import java.net.DatagramPacket;
 import java.security.SecureRandom;
 import net.mc_cubed.icedjava.packet.attribute.Attribute;
+import net.mc_cubed.icedjava.packet.attribute.AttributeFactory;
 import net.mc_cubed.icedjava.packet.attribute.AttributeType;
 import net.mc_cubed.icedjava.packet.attribute.FingerprintAttribute;
-import net.mc_cubed.icedjava.packet.attribute.GenericAttribute;
 
 /**
  * Represents, encodes and decodes the STUN Message Header and checks for
@@ -126,7 +126,7 @@ public class MessageHeader {
                 if (attrType == AttributeType.FINGERPRINT && attrLength == 4) {
                     // Read the attribute
                     Attribute attribute =
-                            GenericAttribute.process(data, off, fingerprintoffset);
+                            AttributeFactory.processOneAttribute(data,off,fingerprintoffset);
 
                     // Validate whether the fingerprint is valid
                     if (attribute instanceof FingerprintAttribute) {

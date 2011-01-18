@@ -25,7 +25,8 @@ import net.mc_cubed.icedjava.util.NumericUtils;
  *
  * @author Charles Chappell
  */
-public class LongAttribute extends GenericAttribute {
+class LongAttribute extends GenericAttribute implements IceControlledAttribute, 
+        IceControllingAttribute {
 
     private final long number;
 

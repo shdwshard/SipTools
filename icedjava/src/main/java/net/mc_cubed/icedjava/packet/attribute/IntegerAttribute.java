@@ -25,7 +25,7 @@ import net.mc_cubed.icedjava.util.NumericUtils;
  *
  * @author Charles Chappell
  */
-public class IntegerAttribute extends GenericAttribute {
+class IntegerAttribute extends GenericAttribute implements PriorityAttribute {
 
     int number;
 
@@ -39,5 +39,10 @@ public class IntegerAttribute extends GenericAttribute {
     public IntegerAttribute(AttributeType type, int length, byte[] value) {
         super(type, length, value);
         NumericUtils.toInt(data);
+    }
+
+    @Override
+    public int getNumber() {
+        return number;
     }
 }
