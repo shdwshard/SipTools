@@ -19,6 +19,7 @@
  */
 package net.mc_cubed.icedjava.stun;
 
+import net.mc_cubed.icedjava.packet.attribute.AttributeFactory;
 import net.mc_cubed.icedjava.packet.attribute.Attribute;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageHeader;
@@ -68,7 +69,7 @@ class StunPacketImpl implements StunPacket {
         this(p.getData(), p.getOffset(), p.getLength(), auth);
     }
 
-    // TODO: Create a new stun packet from a String (Received via TCP for example)
+    @Override
     public byte[] getBytes() {
         // Do a length check of the attributes
         int length = 20; // Length of the STUN header
@@ -94,6 +95,7 @@ class StunPacketImpl implements StunPacket {
         return data;
     }
 
+    @Override
     public List<Attribute> getAttributes() {
         return attributes;
     }
@@ -103,14 +105,17 @@ class StunPacketImpl implements StunPacket {
         return getClass().getName() + "[header=" + header + ":attributes=" + attributes + "]";
     }
 
+    @Override
     public MessageClass getMessageClass() {
         return header.getMessageClass();
     }
 
+    @Override
     public MessageMethod getMethod() {
         return header.getMessageMethod();
     }
 
+    @Override
     public BigInteger getId() {
         if (id == null) {
             id = BigInteger.ZERO;
@@ -123,7 +128,13 @@ class StunPacketImpl implements StunPacket {
         return id;
     }
 
+    @Override
     public byte[] getTransactionId() {
         return header.getTransactionId();
+    }
+
+    @Override
+    public boolean isRfc5389() {
+        return header.isRfc5389header();
     }
 }

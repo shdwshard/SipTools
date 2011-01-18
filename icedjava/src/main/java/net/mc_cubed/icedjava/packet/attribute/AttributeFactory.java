@@ -17,14 +17,13 @@
  * License along with IcedJava.  If not, see
  * <http://www.gnu.org/licenses/>.
  */
-package net.mc_cubed.icedjava.stun;
+package net.mc_cubed.icedjava.packet.attribute;
 
-import net.mc_cubed.icedjava.packet.attribute.GenericAttribute;
-import net.mc_cubed.icedjava.packet.attribute.Attribute;
-import net.mc_cubed.icedjava.packet.attribute.StringAttribute;
+import java.net.InetAddress;
 import net.mc_cubed.icedjava.util.NumericUtils;
 import java.util.LinkedList;
 import java.util.List;
+import net.mc_cubed.icedjava.stun.StunAuthenticator;
 
 /**
  *
@@ -65,5 +64,13 @@ public class AttributeFactory {
 
     public static List<Attribute> processIntoList(byte[] packetBytes, int start, int off, int len) {
         return processIntoList(packetBytes, start, off, len, null);
+    }
+
+    public static MappedAddressAttribute createMappedAddressAttribute(InetAddress address, int port) {
+        return new MappedAddressAttribute(address, port);
+    }
+
+    public static XORMappedAddressAttribute createXORMappedAddressAttribute(InetAddress address, int port,byte[] transactionId) {
+        return new XORMappedAddressAttribute(address, port, transactionId);
     }
 }

@@ -174,7 +174,7 @@ public class MessageHeader {
      * transactionId should be big enough to hold 128 bits
      * This includes the MAGIC_COOKIE above.
      */
-    final byte[] transactionId = new byte[16];
+    final byte[] transactionId;
     /**
      * Indicates whether this header conforms to rfc5389. Will always be true
      * for generated headers, but may be false if packet was received from a
@@ -235,13 +235,9 @@ public class MessageHeader {
         this.messageClass = messageClass;
         this.messageMethod = method;
         if (transactionId == null || transactionId.length == 0) {
-            // Get a secure PRNG
-            SecureRandom random = new SecureRandom();
-            // Get a secure transactionId
-            random.nextBytes(this.transactionId);
-            // Write the magic cookie to the first 32 bits
-            System.arraycopy(MAGIC_COOKIE, 0, this.transactionId, 0, 4);
+            this.transactionId = generateTransactionId();
         } else {
+            this.transactionId = new byte[16];
             int txLength = transactionId.length;
             if (txLength <= 12) {
                 // Need to copy the magic cookie in as well
@@ -260,6 +256,22 @@ public class MessageHeader {
             // Check for Rfc5389 compliance
             checkRfc5389();
         }
+    }
+
+    /**
+     * Generate an RFC 5389 compliant STUN transactionId
+     * 
+     * @return the byte representation of the transactionId in network order
+     */
+    public static byte[] generateTransactionId() {
+        byte[] transactionId = new byte[16];
+        // Get a secure PRNG
+        SecureRandom random = new SecureRandom();
+        // Get a secure transactionId
+        random.nextBytes(transactionId);
+        // Write the magic cookie to the first 32 bits
+        System.arraycopy(MAGIC_COOKIE, 0, transactionId, 0, 4);
+        return transactionId;
     }
 
     /**
@@ -288,6 +300,7 @@ public class MessageHeader {
         bodySize = headerBytes[off + 2] * 0x0100 | headerBytes[off + 3];
 
         // Copy the transaction ID
+        this.transactionId = new byte[16];
         System.arraycopy(headerBytes, off + 4, transactionId, 0, 16);
 
         // Check for Rfc5389 compliance
@@ -363,7 +376,7 @@ public class MessageHeader {
      * Checks the transactionId of this header for the RFC 5389 magic cookie
      */
     private void checkRfc5389() {
-        rfc5389header = checkRfc5389magic(transactionId,0,transactionId.length);
+        rfc5389header = checkRfc5389magic(transactionId, 0, transactionId.length);
     }
 
     /**

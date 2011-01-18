@@ -26,6 +26,12 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 
 /**
+ * RFC 5389 15.1: MAPPED-ADDRESS
+ * The MAPPED-ADDRESS attribute indicates a reflexive transport address of the
+ * client. It consists of an 8-bit address family and a 16-bit port, followed by
+ * a fixed-length value representing the IP address. If the address family is
+ * IPv4, the address MUST be 32 bits. If the address family is IPv6, the address
+ * MUST be 128 bits. All fields must be in network byte order.
  *
  * @author Charles Chappell
  */
@@ -34,12 +40,20 @@ public class MappedAddressAttribute extends GenericAttribute {
     private InetAddress address;
     private int port;
 
-    public MappedAddressAttribute(AttributeType type, int length, byte[] data) {
+    protected MappedAddressAttribute(AttributeType type, int length, byte[] data) {
         super(type, length, data);
 
-        if (data[0] != 0x00) {
-            throw new IllegalArgumentException("Mapped Address Attribute must have a Zeroed first byte");
-        }
+        /**
+         * Removed this check for RFC compliance reasons.
+         *
+         * RFC 5389 15.1: MAPPED-ADDRESS
+         * The first 8 bits of the MAPPED-ADDRESS MUST be set to 0 and MUST be
+         * ignored by receivers. These bits are present for aligning parameters
+         * on natural 32-bit boundaries.
+         */
+        //if (data[0] != 0x00) {
+        //    throw new IllegalArgumentException("Mapped Address Attribute must have a Zeroed first byte");
+        //}
 
 
         // Determine the address family and copy the data to 'addr'
@@ -70,7 +84,7 @@ public class MappedAddressAttribute extends GenericAttribute {
 
     }
 
-    public MappedAddressAttribute(InetAddress address, int port) {
+    protected MappedAddressAttribute(InetAddress address, int port) {
         // Initialize members
         this.type = AttributeType.MAPPED_ADDRESS;
         this.address = address;

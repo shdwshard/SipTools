@@ -65,7 +65,8 @@ public class GenericAttribute implements Attribute {
         Class attributeClass = type.getImplementationClass();
         // Special case
         try {
-            Constructor c = attributeClass.getConstructor(CONSTRUCTOR_ARGS);
+            Constructor c = attributeClass.getDeclaredConstructor(CONSTRUCTOR_ARGS);
+
             Attribute newAttr = (Attribute) c.newInstance(type, length, data);
             if (newAttr instanceof HashAttribute) {
                 byte[] credentials = null;

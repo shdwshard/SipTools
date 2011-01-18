@@ -25,11 +25,8 @@ import com.hoodcomputing.natpmp.NatPmpDevice;
 import com.hoodcomputing.natpmp.NatPmpException;
 import java.io.IOException;
 import java.net.Inet4Address;
-import java.net.InetAddress;
 import java.util.Collection;
 import java.util.LinkedList;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import net.mc_cubed.icedjava.ice.AddressDiscovery;
 import net.mc_cubed.icedjava.ice.AddressDiscoveryMechanism;
 import net.mc_cubed.icedjava.ice.Candidate.CandidateType;
@@ -88,13 +85,33 @@ public class IcePMPBridge implements AddressDiscovery {
         }
     }
 
+    /**
+     * Performs NAT-PMP discovery of candidates based on the LocalCandidates with
+     * IPv4 addresses. IPv6 addresses are not, in general, modified by gateways
+     * and the libraries used do not support IPv6 discovery
+     *
+     * @param localCandidates Candidates to use as a base for NAT-PMP discovery.
+     * This plugin filters all non-local candidates.
+     * @return a list of NAT-PMP discovered candidates based on the LOCAL
+     * candidates supplied in the parameter
+     */
     @Override
     public Collection<LocalCandidate> getCandidates(Collection<LocalCandidate> lcs) {
         Collection<LocalCandidate> retval = new LinkedList<LocalCandidate>();
-        InetAddress natAddress = extIP;
-        for (LocalCandidate lc : lcs) {
-            if (lc.getType() == CandidateType.LOCAL && lc.getAddress() instanceof Inet4Address) {
-                if (pmpDevice != null) {
+
+        /**
+         * Fast fail if a NAT-PMP device wasn't discovered during static
+         * initialization
+         */
+        if (pmpDevice != null) {
+            /**
+             * Loop through the Local Candidates, looking for LOCAL type candidates
+             */
+            for (LocalCandidate lc : lcs) {
+                /**
+                 * Only try NAT-PMP for Host Local IPv4 candidates
+                 */
+                if (lc.getType() == CandidateType.LOCAL && lc.getAddress() instanceof Inet4Address) {
                     try {
                         // Now, we can set up a port mapping. Refer to the javadoc for
                         // the parameter values. This message sets up a TCP redirect from
@@ -116,9 +133,13 @@ public class IcePMPBridge implements AddressDiscovery {
                         // contact a developer on the SourceForge project or post in the
                         // forums if you have questions.
 
-                        retval.add(new LocalCandidate(lc.getOwner(), lc.getIceSocket(), CandidateType.NAT_ASSISTED, natAddress, extPort, lc));
+                        retval.add(new LocalCandidate(lc.getOwner(), lc.getIceSocket(), CandidateType.NAT_ASSISTED, extIP, extPort, lc));
                     } catch (NatPmpException ex) {
-                        Logger.getLogger(IcePMPBridge.class.getName()).log(Level.SEVERE, null, ex);
+                        /**
+                         * In general, we're not too concerned about this exception.
+                         * Usually this means the mapping failed for some reason,
+                         * and we will go on to the next entry.
+                         */
                     }
                 }
             }

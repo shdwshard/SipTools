@@ -64,6 +64,7 @@ import net.mc_cubed.icedjava.ice.Candidate.CandidateType;
 import net.mc_cubed.icedjava.ice.pmp.IcePMPBridge;
 import net.mc_cubed.icedjava.ice.upnp.IceUPNPBridge;
 import net.mc_cubed.icedjava.packet.StunPacket;
+import net.mc_cubed.icedjava.packet.attribute.AttributeFactory;
 import net.mc_cubed.icedjava.packet.attribute.AttributeType;
 import net.mc_cubed.icedjava.packet.attribute.ErrorCodeAttribute;
 import net.mc_cubed.icedjava.packet.attribute.FingerprintAttribute;
@@ -72,7 +73,6 @@ import net.mc_cubed.icedjava.packet.attribute.IntegrityAttribute;
 import net.mc_cubed.icedjava.packet.attribute.LongAttribute;
 import net.mc_cubed.icedjava.packet.attribute.NullAttribute;
 import net.mc_cubed.icedjava.packet.attribute.StringAttribute;
-import net.mc_cubed.icedjava.packet.attribute.XORMappedAddressAttribute;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageHeader;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
@@ -800,9 +800,10 @@ abstract class IceStateMachine implements Runnable, SDPListener,
         switch (packet.getMessageClass()) {
             case REQUEST:
                 StunPacket response = StunUtil.createReplyPacket(packet, MessageClass.SUCCESS);
-                response.getAttributes().add(new XORMappedAddressAttribute(
+                response.getAttributes().add(AttributeFactory.createXORMappedAddressAttribute(
                         ((InetSocketAddress)sourceAddress).getAddress(),
-                        ((InetSocketAddress)sourceAddress).getPort()));
+                        ((InetSocketAddress)sourceAddress).getPort(),
+                        packet.getTransactionId()));
 
                 if (fromPeer.isLocalControlled()) {
                     response.getAttributes().add(new LongAttribute(AttributeType.ICE_CONTROLLING, fromPeer.getTieBreaker()));

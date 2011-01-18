@@ -26,22 +26,61 @@ import java.math.BigInteger;
 import java.util.List;
 
 /**
- * Provides a POJO representation of a Stun Packet.
+ * Provides a POJO representation of a STUN Packet.
  *
  * @author Charles Chappell
  * @since 0.9
  */
 public interface StunPacket {
 
+    /**
+     * Gets a list of attributes contained in this packet.
+     *
+     * @return a list of STUN attributes
+     */
     List<Attribute> getAttributes();
 
+    /**
+     * Creates a binary representation of the STUN packet suitable for network
+     * transmission
+     *
+     * @return a binary representation of this STUN packet
+     */
     byte[] getBytes();
 
+    /**
+     * Get the Transaction ID number of this STUN packet
+     *
+     * @return a BigInteger representation of the Transaction ID number of this
+     * STUN packet
+     */
     BigInteger getId();
 
+    /**
+     * Fetches the message class of this STUN packet.
+     *
+     * @return the message class of this STUN packet
+     */
     MessageClass getMessageClass();
 
+    /**
+     * Fetches the method name of this STUN packet
+     *
+     * @return the method name of this STUN packet
+     */
     MessageMethod getMethod();
 
+    /**
+     * Fetch the binary Transaction ID (same as getId()) of this STUN packet
+     *
+     * @return the binary representation of this packet's transaction ID number
+     */
     public byte[] getTransactionId();
+
+    /**
+     * Determine whether this packet uses an RFC 5389 compliant Transaction ID
+     *
+     * @return true if packet uses an RFC 5389 Transaction ID, false otherwise
+     */
+    public boolean isRfc5389();
 }

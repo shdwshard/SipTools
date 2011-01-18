@@ -23,7 +23,6 @@ import net.mc_cubed.icedjava.packet.attribute.Attribute;
 import net.mc_cubed.icedjava.packet.attribute.AttributeType;
 import net.mc_cubed.icedjava.packet.attribute.ErrorCodeAttribute;
 import net.mc_cubed.icedjava.packet.attribute.FingerprintAttribute;
-import net.mc_cubed.icedjava.packet.attribute.MappedAddressAttribute;
 import net.mc_cubed.icedjava.packet.attribute.SoftwareAttribute;
 import net.mc_cubed.icedjava.packet.attribute.UnknownAttributesAttribute;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
@@ -38,6 +37,7 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.mc_cubed.icedjava.packet.StunPacket;
+import net.mc_cubed.icedjava.packet.attribute.AttributeFactory;
 import net.mc_cubed.icedjava.util.StringUtils;
 
 /**
@@ -62,7 +62,7 @@ public class GenericStunListener implements StunListener {
         if (MessageHeader.isRfc5389StunPacket(p)) {
             try {
                 StunPacketImpl packet = new StunPacketImpl(p);
-                processPacket(packet, (InetSocketAddress)p.getSocketAddress());
+                processPacket(packet, (InetSocketAddress) p.getSocketAddress());
                 return true;
             } catch (Exception ex) {
                 Logger.getLogger(getClass().getName()).log(Level.SEVERE, null, ex);
@@ -96,9 +96,9 @@ public class GenericStunListener implements StunListener {
         }
 
         // Check for a request to a non-server
-        if (type == StunListenerType.CLIENT &&
-                (packet.getMessageClass() == MessageClass.REQUEST ||
-                packet.getMessageClass() == MessageClass.INDICATION)) {
+        if (type == StunListenerType.CLIENT
+                && (packet.getMessageClass() == MessageClass.REQUEST
+                || packet.getMessageClass() == MessageClass.INDICATION)) {
             // Not acting as a server
             StunPacketImpl reply = new StunPacketImpl(MessageClass.ERROR, MessageMethod.BINDING);
             reply.getAttributes().add(new ErrorCodeAttribute(400, "Not acting as a server"));
@@ -112,9 +112,9 @@ public class GenericStunListener implements StunListener {
         }
 
         // Check for a reply to a non-client
-        if (type == StunListenerType.SERVER &&
-                (packet.getMessageClass() == MessageClass.ERROR ||
-                packet.getMessageClass() == MessageClass.SUCCESS)) {
+        if (type == StunListenerType.SERVER
+                && (packet.getMessageClass() == MessageClass.ERROR
+                || packet.getMessageClass() == MessageClass.SUCCESS)) {
             // Not acting as a client
             StunPacketImpl reply = new StunPacketImpl(MessageClass.ERROR, MessageMethod.BINDING, packet.getTransactionId());
             reply.getAttributes().add(new ErrorCodeAttribute(400, "Not acting as a client"));
@@ -191,7 +191,11 @@ public class GenericStunListener implements StunListener {
         InetSocketAddress insocket = (InetSocketAddress) remoteSocket;
         // Don't process any attributes, just reply with the mapped address attribute
         StunPacketImpl reply = new StunPacketImpl(MessageClass.SUCCESS, MessageMethod.BINDING, packet.getTransactionId());
-        reply.getAttributes().add(new MappedAddressAttribute(insocket.getAddress(), insocket.getPort()));
+        if (packet.isRfc5389()) {
+            reply.getAttributes().add(AttributeFactory.createXORMappedAddressAttribute(insocket.getAddress(), insocket.getPort(),packet.getTransactionId()));
+        } else {
+            reply.getAttributes().add(AttributeFactory.createMappedAddressAttribute(insocket.getAddress(), insocket.getPort()));
+        }
         return reply;
     }
 }

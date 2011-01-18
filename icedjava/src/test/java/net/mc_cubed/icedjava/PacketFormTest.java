@@ -20,8 +20,6 @@
 package net.mc_cubed.icedjava;
 
 import net.mc_cubed.icedjava.util.StringUtils;
-import net.mc_cubed.icedjava.packet.attribute.MappedAddressAttribute;
-import net.mc_cubed.icedjava.packet.attribute.XORMappedAddressAttribute;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageHeader;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
@@ -31,6 +29,7 @@ import java.net.UnknownHostException;
 import junit.framework.Assert;
 import junit.framework.TestCase;
 import net.mc_cubed.icedjava.packet.StunPacket;
+import net.mc_cubed.icedjava.packet.attribute.AttributeFactory;
 import net.mc_cubed.icedjava.stun.StunUtil;
 
 /**
@@ -57,8 +56,8 @@ public class PacketFormTest extends TestCase {
     public void testBasicPacket() throws UnknownHostException, UnsupportedEncodingException {
 
         StunPacket packet = StunUtil.createStunRequest(MessageClass.REQUEST, MessageMethod.BINDING);
-        packet.getAttributes().add(new MappedAddressAttribute(InetAddress.getLocalHost(), 1234));
-        packet.getAttributes().add(new XORMappedAddressAttribute(InetAddress.getLocalHost(), 1234, (byte) 0xB7));
+        packet.getAttributes().add(AttributeFactory.createMappedAddressAttribute(InetAddress.getLocalHost(), 1234));
+        packet.getAttributes().add(AttributeFactory.createXORMappedAddressAttribute(InetAddress.getLocalHost(), 1234, packet.getTransactionId()));
 
         byte[] result = packet.getBytes();
         Assert.assertEquals(44, result.length);

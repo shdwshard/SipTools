@@ -63,7 +63,9 @@ class IceReplyImpl implements IceReply,StunReply {
             }
             if (attr.getType() == AttributeType.XOR_MAPPED_ADDRESS) {
                 XORMappedAddressAttribute xmaa = (XORMappedAddressAttribute) attr;
-                mappedAddress = new InetSocketAddress(xmaa.getAddress(), xmaa.getPort());
+                mappedAddress = new InetSocketAddress(
+                        xmaa.getAddress(packet.getTransactionId()),
+                        xmaa.getPort());
             }
             if (attr.getType() == AttributeType.ERROR_CODE) {
                 ErrorCodeAttribute eca = (ErrorCodeAttribute) attr;

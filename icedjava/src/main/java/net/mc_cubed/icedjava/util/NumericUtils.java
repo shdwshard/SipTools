@@ -111,27 +111,27 @@ public class NumericUtils {
         return number;
     }
 
-    public static int toInt(byte[] data) {
+    public static long toInt(byte[] data) {
         return toInt(data, 0);
     }
 
-    public static int toInt(byte[] data, int offset) {
-        int number = 0;
+    public static long toInt(byte[] data, int offset) {
+        long number = 0;
         for (int i = 0; i < INTSIZE; i++) {
             number = number << 8 | (0x00ff & data[offset + i]);
         }
-        return number;
+        return number & 0x00ffffffff;
     }
 
-    public static short toShort(byte[] data) {
+    public static int toShort(byte[] data) {
         return toShort(data, 0);
     }
 
-    public static short toShort(byte[] data, int offset) {
-        short number = 0;
+    public static int toShort(byte[] data, int offset) {
+        int number = 0;
         for (int i = 0; i < SHORTSIZE; i++) {
             number = (short) (number << 8 | (0x00ff & data[offset + i]));
         }
-        return number;
+        return number & 0x0000ffff;
     }
 }
