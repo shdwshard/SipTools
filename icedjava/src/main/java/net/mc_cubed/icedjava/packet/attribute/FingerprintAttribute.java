@@ -49,13 +49,15 @@ public class FingerprintAttribute extends GenericAttribute implements HashAttrib
 
     }
 
+    @Override
     public void computeHash(byte[] data, int offset, int length) {
         crc32Value = computeCRC32(data, offset, length);
         this.data = NumericUtils.toNetworkBytes((int) crc32Value);
         valid = true;
     }
 
-    public boolean verifyHash(byte[] credentials, byte[] data, int offset, int length) {
+    @Override
+    public boolean verifyHash(byte[] data, int offset, int length) {
         long computedHash = computeCRC32(data, offset, length);
         valid = computedHash == crc32Value;
         return valid;
@@ -67,6 +69,7 @@ public class FingerprintAttribute extends GenericAttribute implements HashAttrib
         length = 4;
     }
 
+    @Override
     public boolean isValid() {
         return valid;
     }

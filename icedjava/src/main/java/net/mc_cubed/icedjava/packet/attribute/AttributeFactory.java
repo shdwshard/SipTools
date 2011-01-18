@@ -31,24 +31,11 @@ import net.mc_cubed.icedjava.stun.StunAuthenticator;
  */
 public class AttributeFactory {
 
-    public static List<Attribute> processIntoList(byte[] packetBytes, int start, int off, int len, StunAuthenticator auth) {
+    public static List<Attribute> processIntoList(byte[] packetBytes, int start, int off, int len) {
         List<Attribute> attrList = new LinkedList<Attribute>();
         while (len > 0) {
-            Attribute attr = GenericAttribute.process(packetBytes, start, off, auth);
+            Attribute attr = GenericAttribute.process(packetBytes, start, off);
             if (attr != null) {
-                // Check for authentication attributes
-                if (auth != null) {
-                    switch (attr.getType()) {
-                        case USERNAME:
-                            StringAttribute userAttr = (StringAttribute) attr;
-                            auth.setUsername(userAttr.getValue());
-                            break;
-                        case REALM:
-                            StringAttribute realmAttr = (StringAttribute) attr;
-                            auth.setRealm(realmAttr.getValue());
-                            break;
-                    }
-                }
                 // Add to the attribute list
                 attrList.add(attr);
                 // Move to the next attribute
@@ -62,8 +49,9 @@ public class AttributeFactory {
         return attrList;
     }
 
-    public static List<Attribute> processIntoList(byte[] packetBytes, int start, int off, int len) {
-        return processIntoList(packetBytes, start, off, len, null);
+    @Deprecated
+    public static List<Attribute> processIntoList(byte[] packetBytes, int start, int off, int len, StunAuthenticator auth) {
+        return processIntoList(packetBytes, start, off, len);
     }
 
     public static MappedAddressAttribute createMappedAddressAttribute(InetAddress address, int port) {

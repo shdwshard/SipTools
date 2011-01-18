@@ -19,7 +19,6 @@
  */
 package net.mc_cubed.icedjava.packet.attribute;
 
-import net.mc_cubed.icedjava.stun.StunAuthenticator;
 import net.mc_cubed.icedjava.util.NumericUtils;
 import net.mc_cubed.icedjava.util.StringUtils;
 import java.lang.reflect.Constructor;
@@ -37,18 +36,9 @@ public class GenericAttribute implements Attribute {
     static final Class[] CONSTRUCTOR_ARGS = new Class[]{AttributeType.class, int.class, new byte[0].getClass()};
     static final String MD5_ALGORITHM = "MD5";
 
-    public static byte[] computeMD5(String string) {
-        try {
-            MessageDigest md = MessageDigest.getInstance(MD5_ALGORITHM);
-            return md.digest(string.getBytes());
-        } catch (NoSuchAlgorithmException ex) {
-            Logger.getLogger(GenericAttribute.class.getName()).log(Level.SEVERE, null, ex);
-            return null;
-        }
-    }
     protected byte[] data;
 
-    public static Attribute process(byte[] packetBytes, int start, int offset, StunAuthenticator auth) {
+    public static Attribute process(byte[] packetBytes, int start, int offset) {
         int attrVal = NumericUtils.toShort(packetBytes, offset);
         AttributeType type = AttributeType.getAttributeType(attrVal);
         int length = NumericUtils.toShort(packetBytes, offset + 2);
@@ -69,18 +59,15 @@ public class GenericAttribute implements Attribute {
 
             Attribute newAttr = (Attribute) c.newInstance(type, length, data);
             if (newAttr instanceof HashAttribute) {
-                byte[] credentials = null;
-                if (auth != null) {
-                    String username = auth.getUsername();
-                    String realm = auth.getRealm();
-                    String password = auth.getPassword();
-                    credentials = computeMD5(username + ":" + realm + ":" + password);
-                }
                 HashAttribute hashAttr = (HashAttribute) newAttr;
-                if (hashAttr.verifyHash(credentials, packetBytes, start, offset)) {
-                    Logger.getAnonymousLogger().finer("Found " + type + " attribute and verified it");
+                if (hashAttr.verifyHash(packetBytes, start, offset)) {
+                    Logger.getAnonymousLogger().log(Level.FINER,
+                            "Found {0} attribute and verified it",
+                            type);
                 } else {
-                    Logger.getAnonymousLogger().finer("Found " + type + " attribute and verification failed");
+                    Logger.getAnonymousLogger().log(Level.FINER,
+                            "Found {0} attribute and verification failed",
+                            type);
                 }
 
             }
@@ -88,24 +75,12 @@ public class GenericAttribute implements Attribute {
                 NullAttribute nullattr = (NullAttribute) newAttr;
                 nullattr.setRawAttributeType(attrVal);
             }
-            if (type == AttributeType.USERNAME) {
-                if (auth != null) {
-                    StringAttribute sattr = (StringAttribute)newAttr;
-                    auth.setUsername(sattr.getValue());
-                }
-            }
-            if (type == AttributeType.REALM) {
-                if (auth != null) {
-                    StringAttribute sattr = (StringAttribute)newAttr;
-                    auth.setRealm(sattr.getValue());
-                }
-            }
 
             return newAttr;
         } catch (Exception ex) {
             Logger.getLogger(GenericAttribute.class.getName()).log(Level.SEVERE, null, ex);
-            Logger.getLogger(GenericAttribute.class.getName()).severe(
-                    "Error depacketizing Attribute: " +
+            Logger.getLogger(GenericAttribute.class.getName()).log(
+                    Level.SEVERE, "Error depacketizing Attribute: {0}",
                     StringUtils.getHexString(packetBytes, offset, length + 4));
         }
 
@@ -114,6 +89,7 @@ public class GenericAttribute implements Attribute {
     protected int length;
     protected AttributeType type;
 
+    @Override
     public final int getLength() {
         return length;
     }
@@ -127,14 +103,17 @@ public class GenericAttribute implements Attribute {
     protected GenericAttribute() {
     }
 
+    @Override
     public final byte[] getData() {
         return data;
     }
 
+    @Override
     public AttributeType getType() {
         return type;
     }
 
+    @Override
     final public int write(byte[] data, int off) {
         // If this is a hash attribute, compute the hash now
         if (HashAttribute.class.isInstance(this)) {

@@ -126,7 +126,7 @@ public class MessageHeader {
                 if (attrType == AttributeType.FINGERPRINT && attrLength == 4) {
                     // Read the attribute
                     Attribute attribute =
-                            GenericAttribute.process(data, off, fingerprintoffset, null);
+                            GenericAttribute.process(data, off, fingerprintoffset);
 
                     // Validate whether the fingerprint is valid
                     if (attribute instanceof FingerprintAttribute) {

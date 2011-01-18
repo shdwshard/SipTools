@@ -36,14 +36,13 @@ public interface HashAttribute {
     public void computeHash(byte[] data, int offset, int length);
     /*
      * Verify the message hash used in this attribute
-     * @param credentials Used for authenticated hashes
      * @param data the buffer being used to construct or verify the STUN message
      * @param offset the offset in the buffer where the stun message starts
      * @param length the length of the stun packet UP TO BUT NOT INCLUDING the
      *          attribute the hash is being computed on
      */
 
-    public boolean verifyHash(byte[] credentials, byte[] data, int offset, int length);
+    public boolean verifyHash(byte[] data, int offset, int length);
 
     /*
      * Check the validity of the hash

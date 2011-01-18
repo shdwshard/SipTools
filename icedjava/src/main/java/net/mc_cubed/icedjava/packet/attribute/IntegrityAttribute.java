@@ -20,7 +20,9 @@
 package net.mc_cubed.icedjava.packet.attribute;
 
 import java.security.InvalidKeyException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.crypto.Mac;
@@ -34,6 +36,7 @@ import net.mc_cubed.icedjava.util.StringUtils;
 public class IntegrityAttribute extends GenericAttribute implements HashAttribute {
 
     byte[] credentials;
+    byte[] savedData;
     boolean valid = false;
     private static final String HMAC_SHA1_ALGORITHM = "HmacSHA1";
 
@@ -57,14 +60,26 @@ public class IntegrityAttribute extends GenericAttribute implements HashAttribut
         return null;
     }
 
+    @Override
     public void computeHash(byte[] data, int offset, int length) {
         this.data = computeHMAC_SHA1(credentials, data, offset, length);
     }
 
-    public boolean verifyHash(byte[] credentials, byte[] data, int offset, int length) {
+    public boolean verifyHash(String username, String realm, String password) {
+        byte[] verifyCredentials = computeMD5(username + ":" + realm + ":" + password);
+        return verifyHash(verifyCredentials);
+    }
+
+    public boolean verifyHash(byte[] verifyCredentials) {
+        return verifyHash(verifyCredentials,savedData,0,savedData.length);
+    }
+
+    public boolean verifyHash(byte[] verifyCredentials, byte[] data, int offset, int length) {
         // Compute the signature
-        byte[] signature = computeHMAC_SHA1(credentials, data, offset, length);
-        Logger.getAnonymousLogger().finest("Verify Signature: " + StringUtils.getHexString(signature) + " " + StringUtils.getHexString(this.data));
+        byte[] signature = computeHMAC_SHA1(verifyCredentials, data, offset, length);
+        Logger.getAnonymousLogger().log(Level.FINEST, "Verify Signature: {0} {1}",
+                new Object[]{StringUtils.getHexString(signature),
+                StringUtils.getHexString(this.data)});
 
         // Presume valid
         valid = true;
@@ -92,20 +107,57 @@ public class IntegrityAttribute extends GenericAttribute implements HashAttribut
 
     }
 
-    /*
+    /**
      * Used when forming an integrityAttribute to be SENT to a remote client
      * during an ICE exchange.  Order of the credential string is:
      * Peer UFrag, Sender uFrag, Realm, Peer Password
      */
+    @Deprecated
     public IntegrityAttribute(String localUFrag, String remoteUFrag,
             String realm, String remotePassword) {
         this.type = AttributeType.MESSAGE_INTEGRITY;
-        Logger.getAnonymousLogger().finer("Forming Credentials: " + remoteUFrag + ":" + localUFrag + ":" + realm + ":" + remotePassword);
-        this.credentials = GenericAttribute.computeMD5(remoteUFrag + ":" + localUFrag + ":" + realm + ":" + remotePassword);
+        Logger.getAnonymousLogger().log(Level.FINER, "Forming Credentials: {0}:{1}:{2}:{3}",
+                new Object[]{remoteUFrag, localUFrag, realm, remotePassword});
+        this.credentials = computeMD5(remoteUFrag + ":" + localUFrag + ":" + realm + ":" + remotePassword);
         this.length = 20;
     }
 
+    public IntegrityAttribute(String username, String realm, String password) {
+        this.type = AttributeType.MESSAGE_INTEGRITY;
+        Logger.getAnonymousLogger().log(Level.FINER, "Forming Credentials: {0}:{1}:{2}",
+                new Object[]{username, realm, password});
+        this.credentials = computeMD5(username + ":" + realm + ":" + password);
+        this.length = 20;
+
+    }
+
+    @Override
     public boolean isValid() {
         return valid;
     }
+
+    @Override
+    public boolean verifyHash(byte[] data, int offset, int length) {
+        /**
+         * Make a copy of the data we'll be verifying against, since we cannot
+         * guarantee it won't be modified.
+         */
+        savedData = Arrays.copyOfRange(data, offset, length);
+        /**
+         * This attribute cannot be verified without credentials, so return false
+         * for now since we're deferring verification
+         */
+        return false;
+    }
+
+    protected static byte[] computeMD5(String string) {
+        try {
+            MessageDigest md = MessageDigest.getInstance(MD5_ALGORITHM);
+            return md.digest(string.getBytes());
+        } catch (NoSuchAlgorithmException ex) {
+            Logger.getLogger(GenericAttribute.class.getName()).log(Level.SEVERE, null, ex);
+            return null;
+        }
+    }
+
 }

@@ -72,6 +72,7 @@ import net.mc_cubed.icedjava.packet.attribute.IntegerAttribute;
 import net.mc_cubed.icedjava.packet.attribute.IntegrityAttribute;
 import net.mc_cubed.icedjava.packet.attribute.LongAttribute;
 import net.mc_cubed.icedjava.packet.attribute.NullAttribute;
+import net.mc_cubed.icedjava.packet.attribute.RealmAttribute;
 import net.mc_cubed.icedjava.packet.attribute.StringAttribute;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageHeader;
@@ -286,17 +287,26 @@ abstract class IceStateMachine implements Runnable, SDPListener,
         }
     }
 
+    @Override
+    public void run() {
+        this.getThreadpool().execute(new Runnable() {
+            @Override
+            public void run() {
+                _run();
+            }
+        });
+    }
+
     /*
      * This method implements the ICE State machine.  It is called periodically
      */
-    @Override
-    public synchronized void run() {
+    public void _run() {
         log.entering(getClass().getName(), "run");
         // Ice negociation phase
         try {
             if (iceStatus == IceStatus.IN_PROGRESS) {
                 // If we're controlling, send the SDP offer if timeout has occured,
-                //  or it hasn't been sent yet.
+                // or it hasn't been sent yet.
                 if (localRole == AgentRole.CONTROLLING) {
                     try {
                         // This prevents packet storms
@@ -308,7 +318,6 @@ abstract class IceStateMachine implements Runnable, SDPListener,
                             Connection conn = getDefaultConnection();
 
                             setSdpTimeout(false);
-
 
                             sdpListener.updateMedia(conn, iceAttributes, iceMedias);
                         }
@@ -593,7 +602,7 @@ abstract class IceStateMachine implements Runnable, SDPListener,
     public synchronized void start() {
         if (task == null || task.isDone() == true) {
             iceStatus = IceStatus.IN_PROGRESS;
-            task = getThreadpool().scheduleWithFixedDelay(this, 0, iceInterval, TimeUnit.MILLISECONDS);
+            task = getThreadpool().scheduleAtFixedRate(this, 0, iceInterval, TimeUnit.MILLISECONDS);
         }
     }
 
@@ -677,6 +686,7 @@ abstract class IceStateMachine implements Runnable, SDPListener,
             switch (attr.getType()) {
                 case MAPPED_ADDRESS:
                 case USERNAME:
+                case REALM:
                 case PRIORITY:
                 case USE_CANDIDATE:
                 case ICE_CONTROLLED:
@@ -690,7 +700,9 @@ abstract class IceStateMachine implements Runnable, SDPListener,
         // Isolate which peer by the Username parameter
         StringAttribute userAttribute =
                 (StringAttribute) attrMap.get(AttributeType.USERNAME);
-        if (userAttribute == null) {
+        RealmAttribute realmAttribute =
+                (RealmAttribute) attrMap.get(AttributeType.REALM);
+        if (userAttribute == null || realmAttribute == null) {
             // Ordinary STUN request, pass it along
             log.log(Level.FINER, "Received STUN packet {0}", packet);
             GenericStunListener gsl = new GenericStunListener(source, StunListenerType.BOTH);
@@ -717,10 +729,11 @@ abstract class IceStateMachine implements Runnable, SDPListener,
         // Check message integrity and fingerprint validity
         IntegrityAttribute integrityAttribute =
                 (IntegrityAttribute) attrMap.get(AttributeType.MESSAGE_INTEGRITY);
-        if (packet.getMessageClass() == MessageClass.REQUEST && !integrityAttribute.isValid()) {
+        if (packet.getMessageClass() == MessageClass.REQUEST && !integrityAttribute.verifyHash(userAttribute.getValue(), realmAttribute.getValue(), localPassword)) {
             log.info("Invalid integrity attribute");
             return false;
         }
+
         FingerprintAttribute fingerprintAttribute =
                 (FingerprintAttribute) attrMap.get(AttributeType.FINGERPRINT);
         if (!fingerprintAttribute.isValid()) {
@@ -813,9 +826,10 @@ abstract class IceStateMachine implements Runnable, SDPListener,
                 // Authentication Attributes
                 if (fromPeer.getRemotePassword() != null && fromPeer.getRemoteUFrag() != null) {
                     String realm = "icedjava";
-                    response.getAttributes().add(new StringAttribute(AttributeType.USERNAME, fromPeer.getRemoteUFrag() + ":" + fromPeer.getLocalUFrag()));
+                    String username = fromPeer.getRemoteUFrag() + ":" + fromPeer.getLocalUFrag();
+                    response.getAttributes().add(new StringAttribute(AttributeType.USERNAME, username));
                     response.getAttributes().add(new StringAttribute(AttributeType.REALM, realm));
-                    response.getAttributes().add(new IntegrityAttribute(fromPeer.getLocalUFrag(), fromPeer.getRemoteUFrag(), realm, fromPeer.getRemotePassword()));
+                    response.getAttributes().add(new IntegrityAttribute(username, realm, fromPeer.getRemotePassword()));
                 }
                 response.getAttributes().add(new FingerprintAttribute());
                 try {
@@ -882,6 +896,7 @@ abstract class IceStateMachine implements Runnable, SDPListener,
                                 && !address.isAnyLocalAddress()
                                 && !address.isMulticastAddress()) {
                             DatagramDemultiplexerSocket socket = StunUtil.getDemultiplexerSocket(new InetSocketAddress(address, 0), new MultiDatagramListenerAdapter(this, iceSocket), null);
+                            socket.setMaxRetries(4);
                             socket.setStunListener(new SocketSourceAdapter(socket, this));
                             retval.add(new LocalCandidate(
                                     this,
