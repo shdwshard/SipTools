@@ -14,21 +14,22 @@
         <module>Simple3pcc</module>
     </modules>
     <scm>
-        <connection>scm:svn:https://svn.kenai.com/svn/icedjava~source-code-repository/trunk/</connection>
-        <developerConnection>scm:svn:https://svn.kenai.com/svn/icedjava~source-code-repository/trunk/</developerConnection>
-        <url>http://kenai.com/projects/icedjava</url>
+        <connection>scm:hg:https://hg.java.net/hg/siptools~hg-repository</connection>
+        <developerConnection>scm:hg:https://hg.java.net/hg/siptools~hg-repository</developerConnection>
+        <url>http://java.net/projects/siptools</url>
     </scm>
     <build>
         <plugins>
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>buildnumber-maven-plugin</artifactId>
-                <version>1.0-beta-3</version>
+                <version>${buildnumber_plugin.version}</version>
                 <executions>
                     <execution>
-                        <phase>validate</phase>
+                        <id>define-changeset</id>
+                        <phase>initialize</phase>
                         <goals>
-                            <goal>create</goal>
+                            <goal>hgchangeset</goal>
                         </goals>
                     </execution>
                 </executions>
@@ -109,6 +110,7 @@
         </repository>
     </repositories>
     <properties>
+        <buildnumber_plugin.version>1.0-beta-4</buildnumber_plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 </project>

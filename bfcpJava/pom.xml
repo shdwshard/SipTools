@@ -26,12 +26,13 @@
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>buildnumber-maven-plugin</artifactId>
-                <version>1.0-beta-3</version>
+                <version>${buildnumber_plugin.version}</version>
                 <executions>
                     <execution>
-                        <phase>validate</phase>
+                        <id>define-changeset</id>
+                        <phase>initialize</phase>
                         <goals>
-                            <goal>create</goal>
+                            <goal>hgchangeset</goal>
                         </goals>
                     </execution>
                 </executions>
@@ -84,7 +85,7 @@
                 </configuration>
             </plugin>
         </plugins>
-        <finalName>${artifactId}-${version}-r${buildNumber}</finalName>
+        <finalName>${artifactId}-${version}-r${changeSet}</finalName>
     </build>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
