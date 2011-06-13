@@ -21,6 +21,7 @@ package net.mc_cubed.icedjava.ice;
 
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
+import java.net.SocketAddress;
 import javax.sdp.Media;
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -39,7 +40,6 @@ import javax.sdp.SdpFactory;
 import javax.sdp.SdpParseException;
 import net.mc_cubed.icedjava.stun.DatagramListener;
 import net.mc_cubed.icedjava.stun.StunUtil;
-import org.jboss.netty.channel.ChannelSink;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 
 /**
@@ -241,7 +241,9 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
         int bytesSent = 0;
         for (IcePeer peer : getPeers()) {
             IceSocketChannel sink = peer.getChannels(this).get(componentId);
-            sink.write(p);
+            ByteBuffer bb = ByteBuffer.allocate(p.getLength());
+            bb.put(p.getData(), p.getOffset(), p.getLength());
+            sink.write(bb);
         }
         return bytesSent;
     }
@@ -274,21 +276,26 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
     }
 
     @Override
-    public int receive(ByteBuffer data, short componentId) throws IOException {
+    public SocketAddress receive(ByteBuffer data, short componentId) throws IOException {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public int send(ByteBuffer data, short componentId) throws IOException {
+    public int send(ByteBuffer data, SocketAddress target, short componentId) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+        
+        /*
         int sentBytes = 0;
         for (IcePeer peer : this.getPeers()) {
+            
             sentBytes += this.sendTo(peer, componentId, data.array(), data.arrayOffset(), data.position());
         }
         return sentBytes;
+         */
     }
 
     /**
-     * Close all the actual sockets attached to this ICE socket
+     * Close all the actual sockets attached to this ICE channel
      */
     @Override
     public void close() {
@@ -324,7 +331,7 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
     /**
      * Sends data not to a specific ip/port, but to a specific peer
      * @param peer the peer to send this data to.
-     * @param data the data to send over the socket
+     * @param data the data to send over the channel
      */
     public int sendTo(IcePeer peer, short componentId, byte[] data) throws IOException {
         return sendTo(peer, componentId, data, data.length);
@@ -333,7 +340,7 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
     /**
      * Sends data not to a specific ip/port, but to a specific peer
      * @param peer the peer to send this data to.
-     * @param data the data to send over the socket
+     * @param data the data to send over the channel
      * @param length the length of the data in the byte array to use
      */
     public int sendTo(IcePeer peer, short componentId, byte[] data, int length) throws IOException {
@@ -343,7 +350,7 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
     /**
      * Sends data not to a specific ip/port, but to a specific peer
      * @param peer the peer to send this data to.
-     * @param data the data to send over the socket
+     * @param data the data to send over the channel
      * @param offset where to start copying data from
      * @param length the length of the data in the byte array to use
      */
@@ -361,7 +368,7 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
         CandidatePair pair = peer.getNominated().get(this).get(componentId);
         if (pair != null) {
             packet.setSocketAddress(pair.getRemoteCandidate().getSocketAddress());
-            pair.getLocalCandidate().socket.send(packet);
+            pair.getLocalCandidate().socket.send(ByteBuffer.wrap(packet.getData(), packet.getOffset(), packet.getLength()),packet.getSocketAddress());
             return packet.getLength();
         } else {
             throw new IOException("Peer " + peer + " is not connected via " + this);
@@ -387,4 +394,55 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
              */
         }
     }
+
+    @Override
+    public int write(ByteBuffer data, short componentId) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public int read(ByteBuffer data, short componentId) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public SocketAddress receive(ByteBuffer dst) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public int send(ByteBuffer src, SocketAddress target) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public int read(ByteBuffer bb) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public int write(ByteBuffer bb) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public long read(ByteBuffer[] bbs, int i, int i1) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public long read(ByteBuffer[] bbs) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public long write(ByteBuffer[] bbs, int i, int i1) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public long write(ByteBuffer[] bbs) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
 }

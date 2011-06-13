@@ -52,8 +52,12 @@ public class StreamingTest extends TestCase {
 
         // Create a local peer for a yet unspecified remote peer
         IcePeerImpl localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
+        // Set local only mode
+        localPeer.setLocalOnly(true);
         // Create a "remote" peer
         IcePeerImpl remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLED, remoteSockets);
+        // Set local only mode
+        remotePeer.setLocalOnly(true);
 
         Assert.assertNotNull(localPeer.createOffer());
         // Establish the SDP connection

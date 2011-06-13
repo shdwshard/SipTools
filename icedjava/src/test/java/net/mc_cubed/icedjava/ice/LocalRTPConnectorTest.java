@@ -69,10 +69,14 @@ public class LocalRTPConnectorTest extends TestCase {
 
         // Create a local peer for a yet unspecified remote peer
         IcePeerImpl localPeer = new IcePeerImpl("localPeer",AgentRole.CONTROLLING,localSockets);
+        // Set local only mode
+        localPeer.setLocalOnly(true);
         // Create an SDP offer based on this local peer
         SessionDescription session = localPeer.createOffer();
         // Create a "remote" peer from this SDP info
         IcePeerImpl remotePeer = new IcePeerImpl("remotePeer",AgentRole.CONTROLLED,remoteSockets);
+        // Set local only mode
+        remotePeer.setLocalOnly(true);
 
         
         Assert.assertNotNull(session);
@@ -163,10 +167,12 @@ public class LocalRTPConnectorTest extends TestCase {
 
         // Create a local peer for a yet unspecified remote peer
         IcePeerImpl localPeer = new IcePeerImpl("localPeer",AgentRole.CONTROLLING,localSockets);
+        localPeer.setLocalOnly(true);
         // Create an SDP offer based on this local peer
         SessionDescription session = localPeer.createOffer();
         // Create a "remote" peer from this SDP info
         IcePeerImpl remotePeer = new IcePeerImpl("remotePeer",AgentRole.CONTROLLING,remoteSockets);
+        remotePeer.setLocalOnly(true);
 
         Assert.assertNotNull(session);
 

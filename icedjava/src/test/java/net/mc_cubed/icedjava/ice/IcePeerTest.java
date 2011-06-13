@@ -19,12 +19,14 @@
  */
 package net.mc_cubed.icedjava.ice;
 
-import java.net.InetAddress;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.sdp.SdpException;
 import javax.sdp.SdpFactory;
 import javax.sdp.SdpParseException;
@@ -78,7 +80,11 @@ public class IcePeerTest extends TestCase {
         instance.close();
 
         for (IceSocket socket : iceSockets) {
-            socket.close();
+            try {
+                socket.close();
+            } catch (IOException ex) {
+                Logger.getLogger(IcePeerTest.class.getName()).log(Level.SEVERE, null, ex);
+            }
         }
     }
 

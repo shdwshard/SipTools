@@ -22,58 +22,67 @@ package net.mc_cubed.icedjava.stun;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import junit.framework.Assert;
 import junit.framework.TestCase;
 import net.mc_cubed.icedjava.packet.attribute.AttributeType;
 import net.mc_cubed.icedjava.packet.attribute.SoftwareAttribute;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 /**
  *
  * @author Charles Chappell
  */
+@RunWith(Parameterized.class)
 public class ServerTest extends TestCase {
 
-    private static Integer STUN_PORT = 3478;
-    private DatagramStunSocket socket;
+    static private DatagramStunSocket socket;
+    final private String server;
 
-    public ServerTest(String testName) {
-        super(testName);
+    public ServerTest(String server) {
+        this.server = server;
     }
 
-    @Override
-    protected void setUp() throws Exception {
-        super.setUp();
+    @BeforeClass
+    public static void beforeClass() throws Exception {
         socket = StunUtil.getStunSocket(new InetSocketAddress(0),StunListenerType.CLIENT);
     }
 
-    @Override
-    protected void tearDown() throws Exception {
-        super.tearDown();
-
+    @AfterClass
+    public static void afterClass() throws Exception {
         socket.close();
     }
-
-    // List of STUN servers used for testing lifted from 
-    //  http://www.voip-info.org/wiki/view/STUN
-    public void testKnownServers() throws IOException, InterruptedException, UnknownHostException, ExecutionException {
-        for (String stunServer : StunUtil.serverList) {
-            runTest(stunServer);
+   
+    @Parameters
+    public static Collection<Object[]> serverList() {
+        List<Object[]> retval = new ArrayList<Object[]>(StunUtil.serverList.length);
+        for (String server : StunUtil.serverList) {
+            retval.add(new Object[] {server});            
         }
-
+        
+        return retval;
     }
 
-    private void runTest(String server) throws UnknownHostException, IOException, InterruptedException, ExecutionException {
-        System.out.println(server);
+    @Test
+    public void serverTest() throws UnknownHostException, IOException, InterruptedException, ExecutionException {
 
         for (InetSocketAddress serverSock : StunUtil.getStunServerByName(server)) {
 
             StunReply s = socket.doTest(serverSock).get();
 
-            if (!s.isSuccess()) {
+            if (s != null && !s.isSuccess()) {
                 System.out.println(s.getErrorCode() + " " + s.getErrorReason());
             }
 
+            Assert.assertNotNull("Reply was null testing server: " + serverSock,s);
             Assert.assertTrue(server + " failed! ", s.isSuccess());
 
             SoftwareAttribute software = (SoftwareAttribute) s.getAttribute(AttributeType.SOFTWARE);

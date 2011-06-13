@@ -1,37 +1,23 @@
 /*
- * Copyright 2010 Charles Chappell.
- *
- * This file is part of IcedJava.
- *
- * IcedJava is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation, either version 3 of
- * the License, or (at your option) any later version.
- *
- * IcedJava is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with IcedJava.  If not, see
- * <http://www.gnu.org/licenses/>.
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
  */
-
 package net.mc_cubed.icedjava.ice;
 
-import java.net.DatagramPacket;
-import org.jboss.netty.channel.ChannelSink;
+import java.io.IOException;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.ByteChannel;
+import java.nio.channels.GatheringByteChannel;
+import java.nio.channels.ScatteringByteChannel;
 
 /**
- * Represents an IceSocketChannel which is used to send and receive data from
- * peers connected to a particular socket.
  *
- * @author Charles Chappell
- * @since 1.0
+ * @author charles
  */
-public interface IceSocketChannel extends ChannelSink {
+public interface IceSocketChannel extends ByteChannel, ScatteringByteChannel, GatheringByteChannel {
 
-    public void write(DatagramPacket p);
+    SocketAddress receive(ByteBuffer dst) throws IOException;
 
+    int send(ByteBuffer src, SocketAddress target)throws IOException;
 }

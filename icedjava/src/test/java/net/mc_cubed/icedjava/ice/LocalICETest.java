@@ -81,8 +81,12 @@ public class LocalICETest extends TestCase {
 
             // Create a local peer for a yet unspecified remote peer
             IcePeerImpl localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
+            // Set local only mode
+            localPeer.setLocalOnly(true);
             // Create a "remote" peer
             IcePeerImpl remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLED, remoteSockets);
+            // Set local only mode
+            remotePeer.setLocalOnly(true);
 
             // Establish the SDP connection
             localPeer.setSdpListener(remotePeer);
@@ -201,10 +205,14 @@ public class LocalICETest extends TestCase {
 
             // Create a local peer for a yet unspecified remote peer
             IcePeerImpl localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
+            // Set local only mode
+            localPeer.setLocalOnly(true);
             // Set Aggressive nomination on the controlling peer
             localPeer.setNomination(IceStateMachine.NominationType.AGGRESSIVE);
             // Create a "remote" peer
             IcePeerImpl remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLED, remoteSockets);
+            // Set local only mode
+            remotePeer.setLocalOnly(true);
 
             // Establish the SDP connection
             localPeer.setSdpListener(remotePeer);
@@ -322,8 +330,12 @@ public class LocalICETest extends TestCase {
 
             // Create a local peer for a yet unspecified remote peer
             IcePeerImpl localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
+            // Set local only mode
+            localPeer.setLocalOnly(true);
             // Create a "remote" peer
             IcePeerImpl remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLING, remoteSockets);
+            // Set local only mode
+            remotePeer.setLocalOnly(true);
 
             // Establish the SDP connection
             localPeer.setSdpListener(remotePeer);
@@ -440,10 +452,14 @@ public class LocalICETest extends TestCase {
 
             // Create a local peer for a yet unspecified remote peer
             IcePeerImpl localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
+            // Set local only mode
+            localPeer.setLocalOnly(true);
             // Set Aggressive Nomination on the local peer
             localPeer.setNomination(IceStateMachine.NominationType.AGGRESSIVE);
             // Create a "remote" peer
             IcePeerImpl remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLING, remoteSockets);
+            // Set local only mode
+            remotePeer.setLocalOnly(true);
             // Set Aggressive nomination on the remote peer
             remotePeer.setNomination(IceStateMachine.NominationType.AGGRESSIVE);
 

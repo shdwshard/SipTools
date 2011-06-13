@@ -29,6 +29,7 @@ import java.net.NetworkInterface;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -77,15 +78,13 @@ import net.mc_cubed.icedjava.packet.attribute.UsernameAttribute;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageHeader;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
-import net.mc_cubed.icedjava.stun.DatagramDemultiplexerSocket;
 import net.mc_cubed.icedjava.stun.DatagramStunSocket;
-import net.mc_cubed.icedjava.stun.GenericStunListener;
 import net.mc_cubed.icedjava.stun.StunFactory;
-import net.mc_cubed.icedjava.stun.StunListenerType;
 import net.mc_cubed.icedjava.stun.StunReply;
+import net.mc_cubed.icedjava.stun.StunSocket;
 import net.mc_cubed.icedjava.stun.StunUtil;
 import net.mc_cubed.icedjava.stun.TransportType;
-import org.jboss.netty.buffer.ChannelBuffer;
+import org.jboss.netty.channel.SimpleChannelHandler;
 
 /**
  * Implements the ICE state machine
@@ -93,8 +92,8 @@ import org.jboss.netty.buffer.ChannelBuffer;
  * @author Charles Chappell
  * @since 1.0
  */
-abstract class IceStateMachine implements Runnable, SDPListener,
-        MultiDatagramListener, MultiStunListener {
+abstract class IceStateMachine extends SimpleChannelHandler implements Runnable, SDPListener,
+        MultiDatagramListener, MultiStunListener, IcePeer {
 
     /*
      * Class constants
@@ -145,6 +144,17 @@ abstract class IceStateMachine implements Runnable, SDPListener,
     @Inject
     @AddressDiscoveryMechanism
     Instance<AddressDiscovery> discoveryMechanisms;
+    boolean localOnly = false;
+
+    /**
+     * Sets a flag used for testing only to restrict the scope of the ICE tests
+     * to only use local type IP/port combinations
+     * 
+     * @param localOnlyFlag if true, only use local IPs.
+     */
+    void setLocalOnly(boolean localOnlyFlag) {
+        this.localOnly = localOnlyFlag;
+    }
 
     protected abstract ScheduledExecutorService getThreadpool();
 
@@ -355,7 +365,7 @@ abstract class IceStateMachine implements Runnable, SDPListener,
                         runOneTest(triggeredPair.getLocalCandidate().getIceSocket(), triggeredPair);
                         didTest = true;
                     } else {
-                        // Check for a waiting pair in each socket
+                        // Check for a waiting pair in each channel
                         for (Entry<IceSocket, List<CandidatePair>> pairsEntry : checkPairs.entrySet()) {
                             IceSocket socket = pairsEntry.getKey();
                             List<CandidatePair> pairs = pairsEntry.getValue();
@@ -475,7 +485,17 @@ abstract class IceStateMachine implements Runnable, SDPListener,
                                     PEER_REFLEXIVE_PRIORITY,
                                     tieBreaker,
                                     true);
-                            log.log(Level.FINEST, "Keepalive: {0}:{1} -> {2}:{3} - {4} - {5}", new Object[]{pair.getLocalCandidate().getAddress(), pair.getLocalCandidate().getPort(), pair.getRemoteCandidate().getAddress(), pair.getRemoteCandidate().getPort(), pair.getState(), (result.isSuccess()) ? result.getMappedAddress() : result.getErrorReason()});
+                            if (result != null) {
+                                log.log(Level.FINEST, "Keepalive: {0}:{1} -> {2}:{3} - {4} - {5}", new Object[]{
+                                            pair.getLocalCandidate().getAddress(),
+                                            pair.getLocalCandidate().getPort(),
+                                            pair.getRemoteCandidate().getAddress(),
+                                            pair.getRemoteCandidate().getPort(),
+                                            pair.getState(),
+                                            (result.isSuccess()) ? result.getMappedAddress() : result.getErrorReason()});
+                            } else {
+                                log.log(Level.WARNING, "Got a null reply from an ICE test during keepalive.  This is abnormal. {0}:{1} -> {2}:{3} - {4}", new Object[]{pair.getLocalCandidate().getAddress(), pair.getLocalCandidate().getPort(), pair.getRemoteCandidate().getAddress(), pair.getRemoteCandidate().getPort(), pair.getState()});
+                            }
 
                         }
                     }
@@ -550,9 +570,9 @@ abstract class IceStateMachine implements Runnable, SDPListener,
                         /**
                          * Special case:
                          * Aggressive Nomination type nominates the first 
-                         * successful test on each socket/component, so we 
+                         * successful test on each channel/component, so we 
                          * should re-freeze all other tests in the WAITING state
-                         * with the same socket/componentId
+                         * with the same channel/componentId
                          */
                         if (nomination == NominationType.AGGRESSIVE) {
                             nominate(pair);
@@ -654,7 +674,7 @@ abstract class IceStateMachine implements Runnable, SDPListener,
      * Stun/ICE packet processing
      *
      * @param p The packet in question
-     * @param source The source socket, since one ICE socket may have many StunSockets
+     * @param source The source channel, since one ICE channel may have many StunSockets
      * @return Whether the packet was processed by STUN/ICE.
      */
     @Override
@@ -706,10 +726,8 @@ abstract class IceStateMachine implements Runnable, SDPListener,
         RealmAttribute realmAttribute =
                 (RealmAttribute) attrMap.get(AttributeType.REALM);
         if (userAttribute == null || realmAttribute == null) {
-            // Ordinary STUN request, pass it along
-            log.log(Level.FINER, "Received STUN packet {0}", packet);
-            GenericStunListener gsl = new GenericStunListener(source, StunListenerType.BOTH);
-            return gsl.processPacket(packet, sourceAddress);
+            // Ordinary STUN request, not expecting this
+            return false;
         }
 
         log.log(Level.FINEST, "Received ICE packet {0}", packet);
@@ -862,9 +880,9 @@ abstract class IceStateMachine implements Runnable, SDPListener,
      * collectCandidates if they haven't already been collected, or if refresh
      * is set to true
      *
-     * @param iceSocket socket to return the candidates of
+     * @param iceSocket channel to return the candidates of
      * @param refresh refresh candidates if true, normal behavior if false
-     * @return A list of LocalCandidates for the specified socket
+     * @return A list of LocalCandidates for the specified channel
      */
     List<LocalCandidate> getLocalCandidates(IceSocket iceSocket, boolean refresh) {
         if (!socketCandidateMap.containsKey(iceSocket) || refresh) {
@@ -874,9 +892,9 @@ abstract class IceStateMachine implements Runnable, SDPListener,
     }
 
     /**
-     * Collect a list of candidates for a specified socket.
+     * Collect a list of candidates for a specified channel.
      *
-     * @param iceSocket the socket to collect candidates for
+     * @param iceSocket the channel to collect candidates for
      * @return a list of LocalCandidates
      */
     private List<LocalCandidate> collectCandidates(IceSocket iceSocket) {
@@ -899,9 +917,8 @@ abstract class IceStateMachine implements Runnable, SDPListener,
                                 && !address.isLinkLocalAddress()
                                 && !address.isAnyLocalAddress()
                                 && !address.isMulticastAddress()) {
-                            DatagramDemultiplexerSocket socket = StunUtil.getDemultiplexerSocket(new InetSocketAddress(address, 0), new MultiDatagramListenerAdapter(this, iceSocket), null);
-                            socket.setMaxRetries(4);
-                            socket.setStunListener(new SocketSourceAdapter(socket, this));
+                            StunSocket socket = StunUtil.getStunSocket(new InetSocketAddress(address, 0),this);
+                            //socket.setMaxRetries(4);
                             retval.add(new LocalCandidate(
                                     this,
                                     iceSocket,
@@ -917,46 +934,51 @@ abstract class IceStateMachine implements Runnable, SDPListener,
                         Level.SEVERE, null, ex);
             }
 
-            // If we're in a WELD environment, take advantage of it
-            if (discoveryMechanisms != null && !discoveryMechanisms.isUnsatisfied()) {
-                // For each address discovery mechanism...
-                for (AddressDiscovery discoveryMechanism : discoveryMechanisms) {
-                    try {
-                        // Add additional candidates to the list
-                        retval.addAll(discoveryMechanism.getCandidates(retval));
-                    } catch (Exception ex) {
-                        log.log(Level.INFO, "Exception during address discovery.", ex);
+            /**
+             * Skip additional candidate processing if we're in local only mode.
+             */
+            if (!localOnly) {
+                // If we're in a WELD environment, take advantage of it
+                if (discoveryMechanisms != null && !discoveryMechanisms.isUnsatisfied()) {
+                    // For each address discovery mechanism...
+                    for (AddressDiscovery discoveryMechanism : discoveryMechanisms) {
+                        try {
+                            // Add additional candidates to the list
+                            retval.addAll(discoveryMechanism.getCandidates(retval));
+                        } catch (Exception ex) {
+                            log.log(Level.INFO, "Exception during address discovery.", ex);
+                        }
                     }
-                }
-            } else {
-                /**
-                 * If we're not in a weld environment, that's OK too, but the
-                 * extensibile address discovery mechanisms won't be used.
-                 */
-                try {
-                    // Collect Server Reflexive candidates
-                    retval.addAll(new StunAddressDiscovery().getCandidates(retval));
-                } catch (Exception ex) {
-                    log.log(Level.WARNING, "Caught an Exception during STUN procedures.", ex);
-                }
+                } else {
+                    /**
+                     * If we're not in a weld environment, that's OK too, but the
+                     * extensibile address discovery mechanisms won't be used.
+                     */
+                    try {
+                        // Collect Server Reflexive candidates
+                        retval.addAll(new StunAddressDiscovery().getCandidates(retval));
+                    } catch (Exception ex) {
+                        log.log(Level.WARNING, "Caught an Exception during STUN procedures.", ex);
+                    }
 
-                try {
-                    // Collect UPNP candidates
-                    retval.addAll(new IceUPNPBridge().getCandidates(retval));
-                } catch (Exception ex) {
-                    log.log(Level.FINE, "Caught an Exception during UPNP procedures.", ex);
+                    try {
+                        // Collect UPNP candidates
+                        retval.addAll(new IceUPNPBridge().getCandidates(retval));
+                    } catch (Exception ex) {
+                        log.log(Level.FINE, "Caught an Exception during UPNP procedures.", ex);
+                    }
+
+                    // Collect PMP candidates
+                    try {
+                        // Collect UPNP candidates
+                        retval.addAll(new IcePMPBridge().getCandidates(retval));
+                    } catch (Exception ex) {
+                        log.log(Level.FINE, "Caught an Exception during PMP procedures.", ex);
+                    }
+
+
+                    // TODO: Collect Server Relayed Candidates if supported by server
                 }
-
-                // Collect PMP candidates
-                try {
-                    // Collect UPNP candidates
-                    retval.addAll(new IcePMPBridge().getCandidates(retval));
-                } catch (Exception ex) {
-                    log.log(Level.FINE, "Caught an Exception during PMP procedures.", ex);
-                }
-
-
-                // TODO: Collect Server Relayed Candidates if supported by server
             }
 
         }
@@ -1678,7 +1700,11 @@ abstract class IceStateMachine implements Runnable, SDPListener,
             // Select the candidates to use
             if (nominated.get(socket) != null && nominated.get(socket).size() >= 1) {
                 for (CandidatePair pair : nominated.get(socket)) {
-                    useAddrs.add(pair.getLocalCandidate().getSocketAddress());
+                    if (pair == null || pair.getLocalCandidate() == null) {
+                        log.log(Level.SEVERE, "Got a null local candidate, THIS IS A BUG: {0}", pair);
+                    } else {
+                        useAddrs.add(pair.getLocalCandidate().getSocketAddress());
+                    }
                 }
             } else {
                 for (LocalCandidate candidate : getHighestPriorityLCs(socketCandidateMap.get(socket), socket.getComponents())) {
@@ -1848,15 +1874,16 @@ abstract class IceStateMachine implements Runnable, SDPListener,
     }
 
     /**
-     * Send data to a specific channel on a specific socket belonging to this peer
+     * Send data to a specific channel on a specific channel belonging to this peer
      *
-     * @param socket Socket to send to
-     * @param channel channel on socket to send to
+     * @param channel Socket to send to
+     * @param channel channel on channel to send to
      * @param buf data to send
      */
-    void sendTo(IceSocket socket, short channel, ChannelBuffer buf) {
+    void sendTo(IceSocket socket, short channel, ByteBuffer buf) {
         if (nominated.containsKey(socket) && nominated.get(socket).size() > channel) {
-            nominated.get(socket).get(channel).getLocalCandidate().socket.send(buf);
+            CandidatePair pair = nominated.get(socket).get(channel);
+            pair.getLocalCandidate().socket.send(buf,pair.remoteCandidate.getSocketAddress());
         }
     }
 
@@ -1931,8 +1958,8 @@ abstract class IceStateMachine implements Runnable, SDPListener,
     /**
      * Safely marks a particular candidate as a Nominated candidate.
      * This function can be called asynchronously to ICE processing
-     * @param localSocket Local socket address to nominate
-     * @param remoteSocket Remote socket address to nominate
+     * @param localSocket Local channel address to nominate
+     * @param remoteSocket Remote channel address to nominate
      */
     void setUseCandidate(InetSocketAddress localSocket, InetSocketAddress remoteSocket) {
         //Set this target as the use case.
@@ -2018,7 +2045,11 @@ abstract class IceStateMachine implements Runnable, SDPListener,
         // Close down all connections
         for (List<LocalCandidate> localCandidates : socketCandidateMap.values()) {
             for (LocalCandidate localCandidate : localCandidates) {
-                localCandidate.socket.close();
+                try {
+                    localCandidate.socket.close();
+                } catch (IOException ex) {
+                    Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
         }
         socketCandidateMap.clear();
@@ -2109,15 +2140,39 @@ abstract class IceStateMachine implements Runnable, SDPListener,
     }
     Map<IceSocket, List<IceSocketChannel>> channels;
 
-    public List<IceSocketChannel> getChannels(IceSocket socket) {
+    public List<IceSocketChannel> getChannels(final IceSocket socket) {
         if (!channels.containsKey(socket) && nominated.containsKey(socket)) {
             LinkedList<IceSocketChannel> channelList = new LinkedList<IceSocketChannel>();
             for (short i = (short) 0; i < nominated.get(socket).size(); i++) {
-                channelList.add(new AbstractIceSocketChannel(this, socket, i));
+                
+                final short channelNumber = i;
+                channelList.add(new AbstractIceSocketChannel(this) {
+
+                    @Override
+                    public int read(ByteBuffer bb) throws IOException {
+                        return socket.read(bb, channelNumber);                        
+                    }
+
+                    @Override
+                    public int write(ByteBuffer bb) throws IOException {
+                        return socket.write(bb, channelNumber);
+                    }
+
+                    @Override
+                    public SocketAddress receive(ByteBuffer dst) throws IOException {
+                        return socket.receive(dst, channelNumber);
+                    }
+
+                    @Override
+                    public int send(ByteBuffer src, SocketAddress target) throws IOException {
+                        return socket.send(src, target,channelNumber);
+                    }
+                });
             }
             channels.put(socket, channelList);
         }
 
         return channels.get(socket);
     }
+    
 }

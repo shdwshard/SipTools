@@ -21,6 +21,7 @@ package net.mc_cubed.icedjava.ice;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import javax.sdp.Media;
@@ -33,7 +34,7 @@ import net.mc_cubed.icedjava.stun.DatagramListener;
  * @author Charles Chappell
  * @since 1.0
  */
-public interface IceSocket extends DatagramListener {
+public interface IceSocket extends DatagramListener,IceSocketChannel {
 
     //public int getPort();
 
@@ -53,26 +54,12 @@ public interface IceSocket extends DatagramListener {
      */
     public void setMedia(Media media);
 
-    //public List<LocalCandidate> getLocalCandidates();
-
-    /**
-     * Close this socket.  In practical terms, this means closing down the peers
-     */
-    public void close();
-
     /**
      * Get a list of peers connected to this socket
      * 
      * @return A collection of IcePeers
      */
     public Collection<IcePeer> getPeers();
-
-    /**
-     * Is this IceSocket connected to any peers?
-     *
-     * @return true if yes, false if no
-     */
-    boolean isOpen();
 
  //   public void setDatagramListener(DatagramListener listener);
 
@@ -82,7 +69,7 @@ public interface IceSocket extends DatagramListener {
      * @throws IOException
      */
     public int receive(DatagramPacket p, short componentId) throws IOException;
-    public int receive(ByteBuffer data, short componentId) throws IOException;
+    public SocketAddress receive(ByteBuffer data, short componentId) throws IOException;
 
     /**
      * Send a packet on a specific component of this socket
@@ -92,11 +79,10 @@ public interface IceSocket extends DatagramListener {
      * @throws IOException
      */
     public int send(DatagramPacket data, short componentId) throws IOException;
-    public int send(ByteBuffer data, short componentId) throws IOException;;
-
+    public int send(ByteBuffer data, SocketAddress target, short componentId) throws IOException;
 
     /**
-     * Get the number of components making up this stream
+     * Get the number of components making up this flow
      *
      * @return a whole number of ports/streams in use
      */
@@ -110,5 +96,8 @@ public interface IceSocket extends DatagramListener {
      */
     public boolean isClosed();
 
+    public int write(ByteBuffer data, short componentId) throws IOException;
+    
+    public int read(ByteBuffer data, short componentId) throws IOException;
 
 }

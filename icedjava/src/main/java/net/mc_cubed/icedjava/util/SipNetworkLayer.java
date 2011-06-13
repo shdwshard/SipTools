@@ -47,12 +47,12 @@ public class SipNetworkLayer implements gov.nist.core.net.NetworkLayer {
 
     @Override
     public DatagramSocket createDatagramSocket() throws SocketException {
-        return StunUtil.getDemultiplexerSocket(null).getDatagramSocket();
+        return StunUtil.getDemultiplexerSocket(null,null).getDatagramSocket();
     }
 
     @Override
     public DatagramSocket createDatagramSocket(int port, InetAddress bindAddress) throws SocketException {
-        return StunUtil.getDemultiplexerSocket(new InetSocketAddress(bindAddress,port), null).getDatagramSocket();
+        return StunUtil.getDemultiplexerSocket(new InetSocketAddress(bindAddress,port),null).getDatagramSocket();
     }
 
     @Override

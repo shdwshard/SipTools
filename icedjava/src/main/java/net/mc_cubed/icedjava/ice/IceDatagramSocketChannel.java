@@ -20,11 +20,8 @@
 package net.mc_cubed.icedjava.ice;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
-import org.jboss.netty.channel.ChannelEvent;
-import org.jboss.netty.channel.ChannelPipeline;
-import org.jboss.netty.channel.ChannelPipelineException;
 
 /**
  * JBoss Netty style Socket Channel for sending media to an IceDatagramSocket
@@ -61,6 +58,7 @@ class IceDatagramSocketChannel implements IceSocketChannel {
         this.component = channel;
     }
 
+    @Override
     public long write(ByteBuffer[] bbs, int offset, int length) throws IOException {
         long bytesWritten = 0;
         for (int bnum = offset; bnum < length; bnum++) {
@@ -70,22 +68,28 @@ class IceDatagramSocketChannel implements IceSocketChannel {
         return bytesWritten;
     }
 
+    @Override
     public long write(ByteBuffer[] bbs) throws IOException {
         return write(bbs, 0, bbs.length);
     }
 
+    @Override
     public int write(ByteBuffer bb) throws IOException {
-        return iceSocket.send(bb, this.component);
+        iceSocket.write(bb, component);
+        return bb.remaining();
     }
 
+    @Override
     public boolean isOpen() {
         return iceSocket.isOpen();
     }
 
+    @Override
     public void close() throws IOException {
-        throw new UnsupportedOperationException("Call close on the owning Socket.");
+        iceSocket.close();
     }
 
+    @Override
     public long read(ByteBuffer[] buffers, int offset, int length) throws IOException {
         int bytesRead = 0;
         for (int bufnum = offset; bufnum < length; bufnum++) {
@@ -98,26 +102,23 @@ class IceDatagramSocketChannel implements IceSocketChannel {
         return bytesRead;
     }
 
+    @Override
     public long read(ByteBuffer[] bbs) throws IOException {
         return read(bbs,0,bbs.length);
     }
 
+    @Override
     public int read(ByteBuffer bb) throws IOException {
-        return iceSocket.receive(bb, component);
+        return iceSocket.read(bb, component);
     }
 
     @Override
-    public void write(DatagramPacket p) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public SocketAddress receive(ByteBuffer dst) throws IOException {
+        return iceSocket.receive(dst,component);
     }
 
     @Override
-    public void eventSunk(ChannelPipeline pipeline, ChannelEvent e) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void exceptionCaught(ChannelPipeline pipeline, ChannelEvent e, ChannelPipelineException cause) throws Exception {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public int send(ByteBuffer src, SocketAddress target) throws IOException {
+        return iceSocket.send(src,target,component);
     }
 }

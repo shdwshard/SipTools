@@ -20,14 +20,13 @@
 
 package net.mc_cubed.icedjava.ice;
 
-import net.mc_cubed.icedjava.stun.DatagramDemultiplexerSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import net.mc_cubed.icedjava.stun.DemultiplexerSocket;
+import net.mc_cubed.icedjava.stun.StunSocket;
 import net.mc_cubed.icedjava.stun.TransportType;
 
 /**
- * Represents a local candidate with a socket that can be accessed and used for
+ * Represents a local candidate with a channel that can be accessed and used for
  * various purposes
  *
  * @author Charles Chappell
@@ -43,8 +42,8 @@ public class LocalCandidate extends Candidate {
 
 
     InetSocketAddress stunServer;
-    DemultiplexerSocket socket;
-    private final IceStateMachine owner;
+    StunSocket socket;
+    private final IcePeer owner;
     private final IceSocket iceSocket;
 
     @Override
@@ -56,11 +55,11 @@ public class LocalCandidate extends Candidate {
         return String.valueOf(Math.abs(foundation.hashCode()));
     }
 
-    public LocalCandidate(IceStateMachine owner, IceSocket iceSocket, CandidateType type, DatagramDemultiplexerSocket socket) {
+    public LocalCandidate(IcePeer owner, IceSocket iceSocket, CandidateType type, StunSocket socket) {
         this(owner, iceSocket, type, socket, (short) 0);
     }
 
-    public LocalCandidate(IceStateMachine owner, IceSocket iceSocket, CandidateType type, DemultiplexerSocket socket, short componentId) {
+    public LocalCandidate(IcePeer owner, IceSocket iceSocket, CandidateType type, StunSocket socket, short componentId) {
         this.type = type;
         this.address = socket.getLocalAddress();
         this.port = socket.getLocalPort();
@@ -71,7 +70,7 @@ public class LocalCandidate extends Candidate {
         this.iceSocket = iceSocket;
     }
 
-    public LocalCandidate(IceStateMachine owner, IceSocket iceSocket, CandidateType type, InetAddress address, int port, LocalCandidate base) {
+    public LocalCandidate(IcePeer owner, IceSocket iceSocket, CandidateType type, InetAddress address, int port, LocalCandidate base) {
         this.type = type;
         this.address = address;
         this.port = port;
@@ -120,7 +119,7 @@ public class LocalCandidate extends Candidate {
     /**
      * @return the owner
      */
-    public IceStateMachine getOwner() {
+    public IcePeer getOwner() {
         return owner;
     }
 

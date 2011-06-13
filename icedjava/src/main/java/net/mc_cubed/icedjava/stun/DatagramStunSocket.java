@@ -19,34 +19,33 @@
  */
 package net.mc_cubed.icedjava.stun;
 
+import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
+import net.mc_cubed.icedjava.stun.event.StunEventListener;
 import net.mc_cubed.icedjava.util.ExpiringCache;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.net.DatagramPacket;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.net.SocketException;
 import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.mc_cubed.icedjava.packet.StunPacket;
 import net.mc_cubed.icedjava.packet.attribute.AttributeFactory;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelDownstreamHandler;
 import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipelineCoverage;
 import org.jboss.netty.channel.ChannelStateEvent;
 import org.jboss.netty.channel.ChannelUpstreamHandler;
+import org.jboss.netty.channel.Channels;
 import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelHandler;
@@ -56,11 +55,13 @@ import org.jboss.netty.channel.SimpleChannelHandler;
  * @author Charles Chappell
  */
 @ChannelPipelineCoverage(ChannelPipelineCoverage.ONE)
-public class DatagramStunSocket extends SimpleChannelHandler implements StunPacketSender, ChannelUpstreamHandler, ChannelDownstreamHandler {
+public class DatagramStunSocket extends SimpleChannelHandler implements StunSocket, StunPacketSender, ChannelUpstreamHandler, ChannelDownstreamHandler {
 
     protected Logger log = Logger.getLogger(getClass().getName());
     ExpiringCache<BigInteger, StunReplyFuture> requestCache = new ExpiringCache<BigInteger, StunReplyFuture>();
-    protected StunListener stunListener;
+    ChannelHandlerContext localContext;
+    
+    //protected StunListener stunListener;
     /**
      * RFC 5389 7.1:
      * All STUN messages sent over UDP SHOULD be less than the path MTU if known.
@@ -71,18 +72,8 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunPack
     private int ip6MaxLength = 1232; // IP6 header = 48 bytes fixed
     private int maxRetries = 7; // RFC 5389 7.2.1:  Rc
     private int initialTimeout = 500; // RFC 5389 7.2.1: RTO
-    protected Channel channel;
 
-    protected DatagramStunSocket(StunListenerType type) throws SocketException {
-        this.stunListener = new GenericStunListener(this, type);
-    }
-
-    protected DatagramStunSocket(StunListener stunListener) throws SocketException {
-        this.stunListener = stunListener;
-    }
-
-    protected DatagramStunSocket() throws SocketException {
-        this(StunListenerType.BOTH);
+    protected DatagramStunSocket() {
     }
 
     @Override
@@ -108,9 +99,12 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunPack
             }
 
         }
-        return channel.write(packet, remoteSocket);
+        ChannelFuture future = Channels.future(localContext.getChannel());
+        Channels.write(localContext, future, packet, remoteSocket);
+        return future;
     }
 
+    @Override
     public Future<StunReply> doTest(InetSocketAddress server) throws IOException, InterruptedException {
         return doTest(server.getAddress(), server.getPort());
     }
@@ -125,6 +119,7 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunPack
         return doTest(server, port, request);
     }
 
+    @Override
     public Future<StunReply> doTest(InetSocketAddress server, StunPacket request) throws InterruptedException, IOException {
         return doTest(server.getAddress(), server.getPort(), request);
     }
@@ -199,50 +194,31 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunPack
 
         if (requestFuture != null) {
             requestFuture.setReply(new StunReplyImpl(packet));
+            log.log(Level.INFO, "Setting reply to Stun future: {0}:{1}", new Object[] {packet.getId(),packet});
         } else {
             log.log(Level.INFO, "Got an unexpected reply: {0}", packet);
         }
     }
 
-    protected void notStunPacket(DatagramPacket p) {
-        log.log(Level.INFO, "Received a non-STUN packet on a STUN only socket.  Dropping packet from: {0}", p.getSocketAddress());
-    }
-
+    @Override
     public InetAddress getLocalAddress() {
-        return ((InetSocketAddress) channel.getLocalAddress()).getAddress();
+        return ((InetSocketAddress) localContext.getChannel().getLocalAddress()).getAddress();
     }
 
     @Override
     public String toString() {
-        return getClass().getName() + "[socketAddress=" + channel.getLocalAddress() + "]";
+        return getClass().getName() + "[socketAddress=" + localContext.getChannel().getLocalAddress() + "]";
     }
 
     @Override
     public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
-        try {
-            //DatagramPacket p = new DatagramPacket(new byte[MAX_PACKET_LENGTH], MAX_PACKET_LENGTH);
+        //DatagramPacket p = new DatagramPacket(new byte[MAX_PACKET_LENGTH], MAX_PACKET_LENGTH);
 
-            //super.receive(p);
-            if (e.getMessage() instanceof StunPacket) {
-                stunListener.processPacket((StunPacket) e.getMessage(), e.getRemoteAddress());
-            } else if (e.getMessage() instanceof ChannelBuffer) {
-                ChannelBuffer buf = (ChannelBuffer) e.getMessage();
-                InetSocketAddress remoteAddr = (InetSocketAddress) e.getRemoteAddress();
-
-                byte[] buffer = new byte[buf.readableBytes()];
-                buf.getBytes(0, buffer);
-                DatagramPacket p = new DatagramPacket(buffer, buffer.length, remoteAddr);
-                if (!stunListener.processPacket(p)) {
-                    notStunPacket(p);
-                }
-            } else {
-                log.log(Level.INFO, "Received buffer of unknown type: {0}", e.getMessage().getClass().getName());
-            }
-        } catch (SocketException se) {
-            // We expect this when the socket is closed, so ignore it,
-            // as no problem is occuring.
-        } catch (IOException ex) {
-            Logger.getLogger(DatagramStunSocket.class.getName()).log(Level.SEVERE, null, ex);
+        //super.receive(p);
+        if (e.getMessage() instanceof StunPacket) {
+            storeAndNotify((StunPacket)e.getMessage());
+        } else {
+            log.log(Level.INFO, "Received a non-STUN packet on a STUN only socket.  Dropping packet from: {0}", e.getRemoteAddress());
         }
     }
 
@@ -258,21 +234,84 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunPack
 
     @Override
     public void channelBound(ChannelHandlerContext ctx, ChannelStateEvent e) throws Exception {
-        channel = ctx.getChannel();
-        log.log(Level.FINEST, "Got new channel: {0}", channel);
+        localContext = ctx;
+        log.log(Level.FINEST, "Got new channel context: {0}", ctx);
         ctx.sendUpstream(e);
     }
 
+    @Override
     public void close() {
-        channel.close();
+        localContext.getChannel().close();
     }
 
+    @Override
     public int getLocalPort() {
-        return ((InetSocketAddress) channel.getLocalAddress()).getPort();
+        return ((InetSocketAddress) localContext.getChannel().getLocalAddress()).getPort();
     }
 
+    @Override
     public InetSocketAddress getLocalSocketAddress() {
-        return (InetSocketAddress) channel.getLocalAddress();
+        return (InetSocketAddress) localContext.getChannel().getLocalAddress();
+    }
+
+    @Override
+    public SocketAddress receive(ByteBuffer dst) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public int send(ByteBuffer src, SocketAddress target) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public int read(ByteBuffer bb) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public boolean isOpen() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public int write(ByteBuffer bb) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public long read(ByteBuffer[] bbs, int i, int i1) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public long read(ByteBuffer[] bbs) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public long write(ByteBuffer[] bbs, int i, int i1) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public long write(ByteBuffer[] bbs) throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public TransportType getTransportType() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void registerStunEventListener(StunEventListener listener) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void deregisterStunEventListener(StunEventListener listener) {
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     class StunReplyFuture implements Future<StunReply> {

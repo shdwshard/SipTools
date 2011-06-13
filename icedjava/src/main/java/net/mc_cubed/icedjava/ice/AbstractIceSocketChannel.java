@@ -17,55 +17,83 @@
  * License along with IcedJava.  If not, see
  * <http://www.gnu.org/licenses/>.
  */
-
 package net.mc_cubed.icedjava.ice;
 
+import java.io.IOException;
 import java.net.DatagramPacket;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
-import org.jboss.netty.channel.AbstractChannelSink;
-import org.jboss.netty.channel.ChannelEvent;
-import org.jboss.netty.channel.ChannelPipeline;
-import org.jboss.netty.channel.MessageEvent;
+import java.nio.ByteBuffer;
 
 /**
  *
  * @author Charles Chappell
  * @since 1.0
  */
-public class AbstractIceSocketChannel extends AbstractChannelSink implements IceSocketChannel {
+abstract class AbstractIceSocketChannel implements IceSocketChannel {
 
     protected final IceStateMachine peer;
-    protected final IceSocket socket;
-    protected final short channel;
-    ChannelPipeline pipeline;
-    
-    public AbstractIceSocketChannel(IceStateMachine peer, IceSocket socket, short channel) {
+
+    public AbstractIceSocketChannel(IceStateMachine peer) {
         this.peer = peer;
-        this.socket = socket;
-        this.channel = channel;
     }
 
+    public void write(DatagramPacket p) throws IOException {        
+        write(ByteBuffer.wrap(p.getData(), p.getOffset(), p.getLength()));
 
+    }
 
     @Override
-    public void eventSunk(ChannelPipeline pipeline, ChannelEvent e) throws Exception {
-        if (e instanceof MessageEvent) {
-            MessageEvent evt = (MessageEvent)e;
-            ChannelBuffer buf = (ChannelBuffer)evt.getMessage();
-            peer.sendTo(socket,channel,buf);
+    public abstract int read(ByteBuffer bb) throws IOException;
+
+    @Override
+    public boolean isOpen() {
+        return peer.getIceStatus() == IceStatus.SUCCESS;
+    }
+
+    @Override
+    public void close() throws IOException {
+        peer.close();
+    }
+
+    @Override
+    public abstract int write(ByteBuffer bb) throws IOException;
+
+    @Override
+    public long read(ByteBuffer[] bbs, int off, int len) throws IOException {
+        long readBytes = 0;
+        for (int i = off; i < off + len; i++) {
+            readBytes += read(bbs[i]);
+        }
+        
+        return readBytes;
+    }
+
+    @Override
+    public long read(ByteBuffer[] bbs) throws IOException {
+        long readBytes = 0;
+        for (ByteBuffer bb : bbs) {
+            readBytes += read(bb);
+        }
+        
+        return readBytes;
+    }
+
+    @Override
+    public long write(ByteBuffer[] bbs, int off, int len) throws IOException {
+        long writtenLength = 0;
+        for (int i = off; i < off + len; i++) {
+            writtenLength += write(bbs[i]);
         }
 
-        this.pipeline = pipeline;
+        return writtenLength;
+
     }
 
     @Override
-    public void write(DatagramPacket p) {
-        write(ChannelBuffers.copiedBuffer(p.getData(), p.getOffset(), p.getLength()));
-
+    public long write(ByteBuffer[] bbs) throws IOException {
+        long writtenLength = 0;
+        for (ByteBuffer bb : bbs) {
+            writtenLength += write(bb);
+        }
+        return writtenLength;
     }
-    public void write(ChannelBuffer buf) {
-        pipeline.getChannel().write(buf);
-    }
-
 }

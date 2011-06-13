@@ -19,38 +19,28 @@
  */
 package net.mc_cubed.icedjava.stun;
 
-import java.net.DatagramPacket;
 import java.net.InetAddress;
+import java.util.concurrent.TimeUnit;
 import junit.framework.Assert;
 import junit.framework.TestCase;
+import org.junit.Test;
 
 /**
  *
  * @author Charles Chappell
  */
-public class DemultiplexerSocketTest extends TestCase implements DatagramListener {
+public class DemultiplexerSocketTest extends TestCase {
 
-    public DemultiplexerSocketTest(String testName) {
-        super(testName);
-    }
-
-    @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-    }
-
-    @Override
-    protected void tearDown() throws Exception {
-        super.tearDown();
-    }
-
+    @Test
     public void testSocket() throws Exception, Throwable {
         System.out.println("socket");
-        DatagramDemultiplexerSocket instance1 = StunUtil.getDemultiplexerSocket(1234, this);
-        DatagramDemultiplexerSocket instance2 = StunUtil.getDemultiplexerSocket(5678, this);
+        DatagramDemultiplexerSocket instance1 = StunUtil.getDemultiplexerSocket(0);
+        DatagramDemultiplexerSocket instance2 = StunUtil.getDemultiplexerSocket(0);
 
-        StunReply i1reply = instance1.doTest(InetAddress.getByName("127.0.0.1"), 5678).get();
-        StunReply i2reply = instance2.doTest(InetAddress.getByName("127.0.0.1"), 1234).get();
+        System.out.println("Testing on ports: " + instance1.getLocalPort() + " " + instance2.getLocalPort());
+        
+        StunReply i1reply = instance1.doTest(InetAddress.getByName("127.0.0.1"), instance2.getLocalPort()).get(10000,TimeUnit.MILLISECONDS);
+        StunReply i2reply = instance2.doTest(InetAddress.getByName("127.0.0.1"), instance1.getLocalPort()).get(10000,TimeUnit.MILLISECONDS);
 
         instance1.close();
         instance2.close();
@@ -64,8 +54,4 @@ public class DemultiplexerSocketTest extends TestCase implements DatagramListene
 
     }
 
-    @Override
-    public void deliverDatagram(DatagramPacket p) {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
 }

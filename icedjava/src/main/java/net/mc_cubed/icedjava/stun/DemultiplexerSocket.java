@@ -20,13 +20,11 @@
 package net.mc_cubed.icedjava.stun;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.concurrent.Future;
 import net.mc_cubed.icedjava.packet.StunPacket;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.channel.ChannelFuture;
+import net.mc_cubed.icedjava.stun.event.StunEventListener;
 
 /**
  * A generic demultiplexer socket interface implemented by both Datagram and
@@ -35,7 +33,7 @@ import org.jboss.netty.channel.ChannelFuture;
  * @author Charles Chappell
  * @since 1.0
  */
-public interface DemultiplexerSocket {
+public interface DemultiplexerSocket extends StunSocketChannel {
     /**
      * Returns the transport type of the socket
      * @return TCP if stream based, UDP if datagram based
@@ -75,36 +73,19 @@ public interface DemultiplexerSocket {
      * @throws InterruptedException
      */
     public Future<StunReply> doTest(InetSocketAddress stunServer,StunPacket packet) throws IOException, InterruptedException;
-
-    /**
-     * Close this socket
-     */
-    public void close();
-
-    /**
-     * Send data to the default destination of this socket, or the connected
-     * peer in the case of a stream socket
-     *
-     * @param buf buffer containing the data to send
-     * @return A future which can be used to obtain the status of the operation
-     */
-    public ChannelFuture send(ChannelBuffer buf);
-
-    /**
-     * Send a DatagramPacket using this socket
-     *
-     * @param packet specifies the packet data and destination address
-     * @return A future which can be used to obtain the status of the operation
-     */
-    public ChannelFuture send(DatagramPacket packet);
-
-    /**
-     * Send a datagram packet using this socket
-     *
-     * @param buf buffer containing the data to send
-     * @param destination specifies the target address of the packet
-     * @return A future which can be used to obtain the status of the operation
-     */
-    public ChannelFuture sendTo(ChannelBuffer buf, InetSocketAddress destination);
     
+    /**
+     * Register a stun event listener with this demultiplexer socket.
+     * 
+     * @param listener listener to register
+     */
+    public void registerStunEventListener(StunEventListener listener);
+    
+    /**
+     * De-register a stun event listener from this demultiplexer socket.
+     * 
+     * @param listener listener to register
+     */
+    public void deregisterStunEventListener(StunEventListener listener);
+
 }

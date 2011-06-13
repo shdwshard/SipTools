@@ -6,6 +6,7 @@ package net.mc_cubed.icedjava.stun;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -20,7 +21,9 @@ import net.mc_cubed.icedjava.packet.StunPacket;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
 import net.mc_cubed.icedjava.stun.annotation.StunServer;
+import net.mc_cubed.icedjava.stun.event.StunEventListener;
 import org.jboss.netty.bootstrap.ConnectionlessBootstrap;
+import org.jboss.netty.channel.ChannelHandler;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.Channels;
@@ -45,9 +48,9 @@ public class StunUtil {
     protected static String[] serverList = {
         //        "stun.fwdnet.net",    // Getting timeouts with this server
         "stun.ideasip.com",
-        "stun01.sipphone.com", // Getting timeouts with this server
+        //"stun01.sipphone.com", // Getting timeouts with this server
         "stun.softjoys.com",
-        "stun.voipbuster.com", // Getting timeouts with this server
+        //"stun.voipbuster.com", // Getting timeouts with this server
         "stun.voxgratia.org",
         "stun.xten.com", //        "numb.viagenie.ca", // Getting timeouts with this server
     //        "stun.ipshka.com"   // Getting timeouts with this server
@@ -143,7 +146,16 @@ public class StunUtil {
             @Override
             public ChannelPipeline getPipeline() throws Exception {
                 ChannelPipeline pipeline = Channels.pipeline();
-                pipeline.addLast("DatagramStunSocket", new DatagramStunSocket(stunType));
+                pipeline.addLast("DatagramStunSocket", new DatagramStunSocket());
+                switch (stunType) {
+                    case SERVER:
+                    case BOTH:
+                        pipeline.addFirst("StunRequestHandler", new GenericStunListener());
+                        break;
+                    case CLIENT:
+                    default:
+                        break;
+                }
                 pipeline.addFirst("StunPacketDecoder", new StunPacketDecoder());
                 pipeline.addFirst("StunPacketEncoder", new StunPacketEncoder());
                 return pipeline;
@@ -162,14 +174,15 @@ public class StunUtil {
         return getStunSocket(new InetSocketAddress(address, port),stunType);
     }
 
-    public static DatagramStunSocket getStunSocket(InetSocketAddress address, final StunListener stunListener) {
+    public static DatagramStunSocket getStunSocket(InetSocketAddress address, final ChannelHandler stunHandler) {
         ConnectionlessBootstrap bootstrap = new ConnectionlessBootstrap(getNioDatagramChannelFactory());
         bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
 
             @Override
             public ChannelPipeline getPipeline() throws Exception {
                 ChannelPipeline pipeline = Channels.pipeline();
-                pipeline.addLast("DatagramStunSocket", new DatagramStunSocket(stunListener));
+                pipeline.addLast("DatagramStunSocket", new DatagramStunSocket());
+                pipeline.addFirst("StunRequestHandler", stunHandler);
                 pipeline.addFirst("StunPacketDecoder", new StunPacketDecoder());
                 pipeline.addFirst("StunPacketEncoder", new StunPacketEncoder());
                 return pipeline;
@@ -179,54 +192,62 @@ public class StunUtil {
         return (DatagramStunSocket) channel.getPipeline().get("DatagramStunSocket");
     }
 
-    public static DatagramStunSocket getStunSocket(int port,StunListener stunListener) {
-        return getStunSocket(new InetSocketAddress(port),stunListener);
-    }
-
-    public static DatagramStunSocket getStunSocket(InetAddress address, int port,StunListener stunListener) {
-        return getStunSocket(new InetSocketAddress(address, port),stunListener);
-    }
-
-    public static DatagramDemultiplexerSocket getDemultiplexerSocket(int port, final DatagramListener listener, final StunListener stunListener) {
-        return getDemultiplexerSocket(new InetSocketAddress(port),listener,stunListener);
-    }
-
-    public static DatagramDemultiplexerSocket getDemultiplexerSocket(int port, final DatagramListener listener) {
-        return getDemultiplexerSocket(new InetSocketAddress(port),listener);
-    }
-
-    public static DatagramDemultiplexerSocket getDemultiplexerSocket(final DatagramListener listener, final StunListener stunListener) {
-        return getDemultiplexerSocket((InetSocketAddress)null,listener,stunListener);
-    }
-    public static DatagramDemultiplexerSocket getDemultiplexerSocket(InetSocketAddress inetSocketAddress,final DatagramListener listener, final StunListener stunListener) {
+    public static DatagramStunSocket getStunSocket(int port,final ChannelHandler stunHandler) {
         ConnectionlessBootstrap bootstrap = new ConnectionlessBootstrap(getNioDatagramChannelFactory());
         bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
 
             @Override
             public ChannelPipeline getPipeline() throws Exception {
                 ChannelPipeline pipeline = Channels.pipeline();
-                pipeline.addLast("DatagramStunSocket", new DatagramDemultiplexerSocket(listener,stunListener));
+                pipeline.addLast("DatagramStunSocket", new DatagramStunSocket());
+                pipeline.addFirst("StunRequestHandler", stunHandler);
                 pipeline.addFirst("StunPacketDecoder", new StunPacketDecoder());
                 pipeline.addFirst("StunPacketEncoder", new StunPacketEncoder());
                 return pipeline;
             }
         });
-        DatagramChannel channel = (DatagramChannel)bootstrap.bind(inetSocketAddress);
-        return (DatagramDemultiplexerSocket) channel.getPipeline().get("DatagramStunSocket");
+        DatagramChannel channel = (DatagramChannel)bootstrap.bind(new InetSocketAddress(port));
+        return (DatagramStunSocket) channel.getPipeline().get("DatagramStunSocket");
     }
-
-    public static DatagramDemultiplexerSocket getDemultiplexerSocket(final DatagramListener listener) {
-        return getDemultiplexerSocket((InetSocketAddress)null,listener);
-    }
-
-    public static DatagramDemultiplexerSocket getDemultiplexerSocket(InetSocketAddress inetSocketAddress, final DatagramListener listener) {
+    
+    public static DatagramChannel getCustomStunDatagramChannel(SocketAddress address, final ChannelHandler stunHandler) {
         ConnectionlessBootstrap bootstrap = new ConnectionlessBootstrap(getNioDatagramChannelFactory());
         bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
 
             @Override
             public ChannelPipeline getPipeline() throws Exception {
                 ChannelPipeline pipeline = Channels.pipeline();
-                pipeline.addLast("DatagramStunSocket", new DatagramDemultiplexerSocket(listener));
+                pipeline.addFirst("StunRequestHandler", stunHandler);
+                pipeline.addFirst("StunPacketDecoder", new StunPacketDecoder());
+                pipeline.addFirst("StunPacketEncoder", new StunPacketEncoder());
+                return pipeline;
+            }
+        });
+        DatagramChannel channel = (DatagramChannel)bootstrap.bind(address);
+        return channel;
+        
+    }
+
+    public static DatagramStunSocket getStunSocket(InetAddress address, int port,ChannelHandler stunHandler) {
+        return getStunSocket(new InetSocketAddress(address, port),stunHandler);
+    }
+
+    public static DatagramDemultiplexerSocket getDemultiplexerSocket(int port) {
+        return getDemultiplexerSocket(new InetSocketAddress(port),null);
+    }
+
+    public static DatagramDemultiplexerSocket getDemultiplexerSocket() {
+        return getDemultiplexerSocket((InetSocketAddress)null,null);
+    }
+    public static DatagramDemultiplexerSocket getDemultiplexerSocket(InetSocketAddress inetSocketAddress,final StunEventListener stunEventListener) {
+        ConnectionlessBootstrap bootstrap = new ConnectionlessBootstrap(getNioDatagramChannelFactory());
+        bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
+
+            @Override
+            public ChannelPipeline getPipeline() throws Exception {
+                ChannelPipeline pipeline = Channels.pipeline();
+                pipeline.addLast("DatagramStunSocket", new DatagramDemultiplexerSocket(stunEventListener));
+                pipeline.addFirst("StunRequestHandler", new GenericStunListener());
                 pipeline.addFirst("StunPacketDecoder", new StunPacketDecoder());
                 pipeline.addFirst("StunPacketEncoder", new StunPacketEncoder());
                 return pipeline;
