@@ -21,7 +21,6 @@ package net.mc_cubed.icedjava.ice;
 
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
-import java.net.SocketAddress;
 import javax.sdp.Media;
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -38,7 +37,6 @@ import javax.sdp.Attribute;
 import javax.sdp.MediaDescription;
 import javax.sdp.SdpFactory;
 import javax.sdp.SdpParseException;
-import net.mc_cubed.icedjava.stun.DatagramListener;
 import net.mc_cubed.icedjava.stun.StunUtil;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 
@@ -54,13 +52,12 @@ import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
  * @see IceStreamSocket
  * @see IceSocket
  */
-public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements IceSocket, IcePeerListener {
+public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements IceSocket {
 
     private final InetSocketAddress stunServer;
     private Map<String, IcePeer> _peers = new HashMap<String, IcePeer>();
     private final static Logger log =
             Logger.getLogger(net.mc_cubed.icedjava.ice.IceDatagramSocket.class.getName());
-    private DatagramListener datagramListener;
     private Short components;
     protected Media media;
     public static final String PROP_MEDIA = "media";
@@ -169,15 +166,6 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
         return getPeerMap().get(uFrag);
     }
 
-    /**
-     * Used in a multi-to-one type mapping, where data from multiple sources will
-     * be directed to a single application component, as in the case of RTP/RTCP
-     * @param listener The datagramListener which will receive the packets
-     */
-    public void setDatagramListener(DatagramListener listener) {
-        this.datagramListener = listener;
-    }
-
     @Override
     public boolean isClosed() {
         return !isOpen();
@@ -194,6 +182,7 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
      *
      * @return the value of socketChannels
      */
+    @Override
     public IceSocketChannel[] getSocketChannels() {
         return socketChannels;
     }
@@ -215,7 +204,8 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
      * @param index
      * @return the value of socketChannels at specified index
      */
-    public IceSocketChannel getSocketChannels(int index) {
+    @Override
+    public IceSocketChannel getSocketChannel(short index) {
         return this.socketChannels[index];
     }
 
@@ -236,7 +226,7 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
-    @Override
+/*    @Override
     public int send(DatagramPacket p, short componentId) throws IOException {
         int bytesSent = 0;
         for (IcePeer peer : getPeers()) {
@@ -246,12 +236,7 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
             sink.write(bb);
         }
         return bytesSent;
-    }
-
-    @Override
-    public void processDatagram(IcePeer peer, short flow, DatagramPacket p) {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
+    }*/
 
     @Override
     public boolean isOpen() {
@@ -276,22 +261,8 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
     }
 
     @Override
-    public SocketAddress receive(ByteBuffer data, short componentId) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public int send(ByteBuffer data, SocketAddress target, short componentId) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-        
-        /*
-        int sentBytes = 0;
-        for (IcePeer peer : this.getPeers()) {
-            
-            sentBytes += this.sendTo(peer, componentId, data.array(), data.arrayOffset(), data.position());
-        }
-        return sentBytes;
-         */
+    public IcePeer receive(ByteBuffer data, short componentId) throws IOException {
+        return getSocketChannel(componentId).receive(data);
     }
 
     /**
@@ -355,21 +326,22 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
      * @param length the length of the data in the byte array to use
      */
     public int sendTo(IcePeer peer, short componentId, byte[] data, int offset, int length) throws IOException {
-        DatagramPacket p = new DatagramPacket(data, offset, length);
-        return sendTo(peer, componentId, p);
+        ByteBuffer bb = ByteBuffer.wrap(data, offset, length);
+        return sendTo(peer, componentId, bb);
     }
 
     /**
      * Sends data not to a specific ip/port, but to a specific peer
      * @param peer the peer to send this data to.
-     * @param packet the packet to send to the peer
+     * @param buffer the packet to send to the peer
      */
-    public int sendTo(IcePeer peer, short componentId, DatagramPacket packet) throws IOException {
+    @Override
+    public int sendTo(IcePeer peer, short componentId, ByteBuffer buffer) throws IOException {
         CandidatePair pair = peer.getNominated().get(this).get(componentId);
         if (pair != null) {
-            packet.setSocketAddress(pair.getRemoteCandidate().getSocketAddress());
-            pair.getLocalCandidate().socket.send(ByteBuffer.wrap(packet.getData(), packet.getOffset(), packet.getLength()),packet.getSocketAddress());
-            return packet.getLength();
+            int remainingBytes = buffer.remaining();
+            pair.getLocalCandidate().socket.send(buffer, pair.getRemoteCandidate().getSocketAddress());
+            return remainingBytes;
         } else {
             throw new IOException("Peer " + peer + " is not connected via " + this);
         }
@@ -381,68 +353,20 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
     }
 
     @Override
-    public void deliverDatagram(DatagramPacket p) {
-        if (datagramListener != null) {
-            datagramListener.deliverDatagram(p);
-        } else {
-            /*
-            String trace = "";
-            for (StackTraceElement elem : Thread.currentThread().getStackTrace()) {
-                trace += elem.toString() + "\n";
-            }
-            log.log(Level.WARNING, "Dropping datagram: {0}\n{1}", new Object[] {p, trace});
-             */
-        }
-    }
-
-    @Override
     public int write(ByteBuffer data, short componentId) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
+        for (IcePeer peer : this.getPeerMap().values()) {
+            sendTo(peer, componentId, data);
+        }
+        return 0;
     }
 
     @Override
     public int read(ByteBuffer data, short componentId) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return getSocketChannel(componentId).read(data);
     }
 
     @Override
-    public SocketAddress receive(ByteBuffer dst) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public int send(ByteBuffer data, short componentId) throws IOException {
+        return write(data,componentId);
     }
-
-    @Override
-    public int send(ByteBuffer src, SocketAddress target) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public int read(ByteBuffer bb) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public int write(ByteBuffer bb) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public long read(ByteBuffer[] bbs, int i, int i1) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public long read(ByteBuffer[] bbs) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public long write(ByteBuffer[] bbs, int i, int i1) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public long write(ByteBuffer[] bbs) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
 }

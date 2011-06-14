@@ -27,6 +27,7 @@ import java.net.DatagramPacket;
  *
  * @author Charles Chappell
  * @since 0.9
+ * @deprecated 1.0
  */
 public interface IcePeerListener {
     void processDatagram(IcePeer peer, short flow, DatagramPacket p);

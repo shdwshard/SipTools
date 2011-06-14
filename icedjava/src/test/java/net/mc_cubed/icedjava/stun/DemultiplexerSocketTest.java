@@ -28,7 +28,7 @@ import org.junit.Test;
 /**
  *
  * @author Charles Chappell
- */
+ */ 
 public class DemultiplexerSocketTest extends TestCase {
 
     @Test
@@ -39,18 +39,18 @@ public class DemultiplexerSocketTest extends TestCase {
 
         System.out.println("Testing on ports: " + instance1.getLocalPort() + " " + instance2.getLocalPort());
         
-        StunReply i1reply = instance1.doTest(InetAddress.getByName("127.0.0.1"), instance2.getLocalPort()).get(10000,TimeUnit.MILLISECONDS);
-        StunReply i2reply = instance2.doTest(InetAddress.getByName("127.0.0.1"), instance1.getLocalPort()).get(10000,TimeUnit.MILLISECONDS);
+        StunReply i1reply = instance1.doTest(InetAddress.getByName("127.0.0.1"), instance2.getLocalPort()).get();
+        StunReply i2reply = instance2.doTest(InetAddress.getByName("127.0.0.1"), instance1.getLocalPort()).get();
 
         instance1.close();
         instance2.close();
 
-        Assert.assertTrue("Got wrong reply: " + i1reply, i1reply.isSuccess());
-        Assert.assertTrue("Got wrong reply: " + i2reply, i2reply.isSuccess());
+        Assert.assertTrue("Got wrong reply: " + i1reply + " " + i1reply.getPacket(), i1reply.isSuccess());
+        Assert.assertTrue("Got wrong reply: " + i2reply + " " + i2reply.getPacket(), i2reply.isSuccess());
         Assert.assertEquals("Got wrong reply: " + i1reply,i1reply.getMappedAddress().getAddress().getHostAddress(), "127.0.0.1");
         Assert.assertEquals("Got wrong reply: " + i2reply,i2reply.getMappedAddress().getAddress().getHostAddress(), "127.0.0.1");
-        Assert.assertEquals("Got wrong reply: " + i1reply,i1reply.getMappedAddress().getPort(), 1234);
-        Assert.assertEquals("Got wrong reply: " + i2reply,i2reply.getMappedAddress().getPort(), 5678);
+        Assert.assertEquals("Got wrong reply: " + i1reply,i1reply.getMappedAddress().getPort(), instance1.getLocalPort());
+        Assert.assertEquals("Got wrong reply: " + i2reply,i2reply.getMappedAddress().getPort(), instance2.getLocalPort());
 
     }
 

@@ -19,22 +19,25 @@
  */
 package net.mc_cubed.icedjava.ice;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.media.protocol.ContentDescriptor;
 import javax.media.protocol.SourceTransferHandler;
 import javax.sdp.SdpParseException;
-import net.mc_cubed.icedjava.stun.DatagramListener;
 import java.io.IOException;
-import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.Queue;
 import javax.media.protocol.PushSourceStream;
 import javax.media.rtp.OutputDataStream;
 import javax.media.rtp.RTPConnector;
 import javax.sdp.Media;
-
+import net.mc_cubed.icedjava.ice.event.BytesAvailableEvent;
+import net.mc_cubed.icedjava.ice.event.IceEvent;
+import net.mc_cubed.icedjava.ice.event.IceEventListener;
 /**
  * IcedRTPConnector implements a RTP Connector implementation that leverages the
  * IcedJava library to deliver RTP/RTCP media streams between potentially NATed
@@ -44,17 +47,17 @@ import javax.sdp.Media;
  * @since 0.9
  */
 public class IcedRTPConnector extends IceDatagramSocket
-        implements RTPConnector,IceSocket {
+        implements RTPConnector, IceSocket {
 
     private final BidirectionalStreamSocket rtpSocket;
     private final BidirectionalStreamSocket rtcpSocket;
 
     public IcedRTPConnector(InetSocketAddress stunServer, Media media, InetAddress defaultIP) throws SocketException, SdpParseException {
-        super(stunServer,media);
+        super(stunServer, media);
 
-        rtpSocket = new BidirectionalStreamSocket((short)0);
+        rtpSocket = new BidirectionalStreamSocket((short) 0);
         if (media.getPortCount() >= 2) {
-            rtcpSocket = new BidirectionalStreamSocket((short)1);
+            rtcpSocket = new BidirectionalStreamSocket((short) 1);
         } else {
             rtcpSocket = rtpSocket;
         }
@@ -129,66 +132,65 @@ public class IcedRTPConnector extends IceDatagramSocket
     }
 
     class BidirectionalStreamSocket implements PushSourceStream,
-            OutputDataStream, DatagramListener {
+            OutputDataStream, IceEventListener {
 
-        final private Queue<DatagramPacket> packetQueue =
-                new LinkedList<DatagramPacket>();
+        final private Queue<ByteBuffer> packetQueue =
+                new LinkedList<ByteBuffer>();
         private IceDatagramSocket socket;
         private SourceTransferHandler sourceHandler;
         private final ContentDescriptor contentDescriptor;
         private final short componentId;
+        private final int MAX_PACKET_SIZE = 4096;
 
         private BidirectionalStreamSocket(short componentId) {
-            this(componentId,null);
+            this(componentId, null);
         }
-        
+
         private BidirectionalStreamSocket(short componentId,
                 ContentDescriptor contentDescriptor) {
             this.socket = IcedRTPConnector.this;
             this.contentDescriptor = contentDescriptor;
-            socket.setDatagramListener(this);
             this.componentId = componentId;
         }
 
         /*********************************************
          * PushSourceStream interface implementation *
          *********************************************/
-
         /**
          * Read from the stream without blocking. Returns -1 when the end of the media is reached.
-         * @param buffer The buffer to read bytes into.
+         * @param outBuffer The buffer to read bytes into.
          * @param offset The offset into the buffer at which to begin writing data.
          * @param length The number of bytes to read.
          * @return The number of bytes read or -1 when the end of stream is reached.
          * @throws IOException Thrown if an error occurs while reading
          */
         @Override
-        public int read(byte[] buffer, int offset, int length) throws IOException {
+        public int read(byte[] outBuffer, int offset, int length) throws IOException {
             // Get the monitor since we're about to do something sensitive to 
             // changes in the queue
             synchronized (packetQueue) {
                 // Basic Sanity checks, do these before we remove the packet from
                 // the queue.  This is why we need the monitor.
-                DatagramPacket packet = packetQueue.peek();
-                if (packet != null) {
-                    if (length < packet.getLength()) {
+                ByteBuffer inBuffer = packetQueue.peek();
+                if (inBuffer != null) {
+                    if (length < inBuffer.remaining()) {
                         throw new IOException("Packet size greater than buffer length");
                     }
-                    if (buffer.length - offset < length) {
+                    if (outBuffer.length - offset < length) {
                         throw new IOException("Buffer Size Overrun");
                     }
 
                     // Get the packet we just peeked at
-                    packet = packetQueue.poll();
+                    inBuffer = packetQueue.poll();
                     // Copy the data
                     try {
-                        System.arraycopy(packet.getData(), packet.getOffset(), buffer, offset, packet.getLength());
+                        System.arraycopy(inBuffer.array(), inBuffer.arrayOffset(), outBuffer, offset, inBuffer.remaining());
                     } catch (Exception ex) {
                         // Replace the packet in the queue if an exception occurs
-                        ((LinkedList)packetQueue).addFirst(packet);
-                        throw new IOException("Exception thrown while copying data into read buffer",ex);
+                        ((LinkedList) packetQueue).addFirst(inBuffer);
+                        throw new IOException("Exception thrown while copying data into read buffer", ex);
                     }
-                    return packet.getLength();
+                    return inBuffer.remaining();
                 } else {
                     return 0;
                 }
@@ -206,9 +208,9 @@ public class IcedRTPConnector extends IceDatagramSocket
          */
         @Override
         public int getMinimumTransferSize() {
-            DatagramPacket packet = packetQueue.peek();
+            ByteBuffer packet = packetQueue.peek();
             if (packet != null) {
-                return packet.getLength();
+                return packet.remaining();
             } else {
                 return -1;
             }
@@ -233,6 +235,7 @@ public class IcedRTPConnector extends IceDatagramSocket
         public ContentDescriptor getContentDescriptor() {
             return contentDescriptor;
         }
+
         /**
          * Get the size, in bytes, of the content on this stream. LENGTH_UNKNOWN is returned if the length is not known.
          * @return The content length in bytes.
@@ -241,6 +244,7 @@ public class IcedRTPConnector extends IceDatagramSocket
         public long getContentLength() {
             return LENGTH_UNKNOWN;
         }
+
         /**
          * Find out if the end of the stream has been reached.
          * @return
@@ -252,7 +256,7 @@ public class IcedRTPConnector extends IceDatagramSocket
 
         /**
          * Obtain the collection of objects that control the object that implements this interface.
-
+        
          * If no controls are supported, a zero length array is returned.
          * @return the collection of object controls
          */
@@ -276,7 +280,6 @@ public class IcedRTPConnector extends IceDatagramSocket
         /*********************************************
          * OutputDataStream interface implementation *
          *********************************************/
-
         /**
          * Write data to the underlying network. Data is copied from the buffer
          * starting af offset. Number of bytes copied is length
@@ -288,9 +291,9 @@ public class IcedRTPConnector extends IceDatagramSocket
         @Override
         @SuppressWarnings("CallToThreadDumpStack")
         public int write(byte[] buffer, int offset, int length) {
-            DatagramPacket p = new DatagramPacket(buffer,offset,length);
+            ByteBuffer bb = ByteBuffer.wrap(buffer, offset, length);
             try {
-                socket.send(p,componentId);
+                socket.send(bb, componentId);
             } catch (Exception ex) {
                 ex.printStackTrace();
                 return -1;
@@ -298,25 +301,6 @@ public class IcedRTPConnector extends IceDatagramSocket
             return length;
         }
 
-        /*********************************************
-         * DatagramListener interface implementation *
-         *********************************************/
-
-        @Override
-        public void deliverDatagram(DatagramPacket p) {
-            // Get object's monitor since we're changing it.
-            synchronized (packetQueue) {
-                // Add the packet to the queue
-                packetQueue.add(p);
-                // Notify all listeners in case someone is waiting for data
-                packetQueue.notifyAll();
-            }
-            // If there's a source handler set, notify them too
-            // Do this outside synchronized block to avoid potential deadlocks
-            if (sourceHandler != null) {
-                sourceHandler.transferData(this);
-            }
-        }
 
         /**
          * Gets the underlying socket of this stream
@@ -325,6 +309,32 @@ public class IcedRTPConnector extends IceDatagramSocket
         protected IceDatagramSocket getSocket() {
             return socket;
 
+        }
+
+        @Override
+        public void iceEvent(IceEvent event) {
+            if (event instanceof BytesAvailableEvent) {                
+                try {
+                    BytesAvailableEvent bytesEvent = (BytesAvailableEvent) event;
+                    ByteBuffer buffer = ByteBuffer.allocate(MAX_PACKET_SIZE);
+                    bytesEvent.getSocketChannel().receive(buffer); 
+                    // Get object's monitor since we're changing it.
+                    synchronized (packetQueue) {
+                        // Add the packet to the queue
+                        packetQueue.add(buffer);
+                        // Notify all listeners in case someone is waiting for data
+                        packetQueue.notifyAll();
+                    }
+                    // If there's a source handler set, notify them too
+                    // Do this outside synchronized block to avoid potential deadlocks
+                    if (sourceHandler != null) {
+                        sourceHandler.transferData(this);
+                    }
+                } catch (IOException ex) {
+                    Logger.getLogger(IcedRTPConnector.class.getName()).log(Level.SEVERE, null, ex);
+                }
+
+            }
         }
     }
 }

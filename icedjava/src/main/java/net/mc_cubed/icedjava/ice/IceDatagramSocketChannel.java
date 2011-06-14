@@ -20,8 +20,18 @@
 package net.mc_cubed.icedjava.ice;
 
 import java.io.IOException;
-import java.net.SocketAddress;
 import java.nio.ByteBuffer;
+import java.util.HashSet;
+import java.util.Queue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.enterprise.event.Event;
+import javax.inject.Inject;
+import net.mc_cubed.icedjava.ice.event.IceEventListener;
+import net.mc_cubed.icedjava.ice.event.IceEvent;
+import net.mc_cubed.icedjava.stun.event.StunEvent;
+import net.mc_cubed.icedjava.stun.event.StunEventListener;
 
 /**
  * JBoss Netty style Socket Channel for sending media to an IceDatagramSocket
@@ -30,9 +40,14 @@ import java.nio.ByteBuffer;
  * @since 1.0
  * @see IceDatagramSocket
  */
-class IceDatagramSocketChannel implements IceSocketChannel {
+class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
 
+    protected HashSet<IceEventListener> listeners = new HashSet<IceEventListener>();
+    protected final static Logger log = Logger.getLogger(IceDatagramSocketChannel.class.getName());
     protected final IceSocket iceSocket;
+    protected Queue<PeerAddressedByteBuffer> queue = new LinkedBlockingQueue<PeerAddressedByteBuffer>();
+    @Inject
+    Event<IceEvent> eventBroadcaster;
 
     /**
      * Get the value of iceSocket
@@ -104,21 +119,56 @@ class IceDatagramSocketChannel implements IceSocketChannel {
 
     @Override
     public long read(ByteBuffer[] bbs) throws IOException {
-        return read(bbs,0,bbs.length);
+        return read(bbs, 0, bbs.length);
     }
 
     @Override
-    public int read(ByteBuffer bb) throws IOException {
-        return iceSocket.read(bb, component);
+    public int read(ByteBuffer dst) throws IOException {
+        PeerAddressedByteBuffer src = queue.poll();
+        dst.put(src.getBuffer());
+        return dst.remaining();
     }
 
     @Override
-    public SocketAddress receive(ByteBuffer dst) throws IOException {
-        return iceSocket.receive(dst,component);
+    public IcePeer receive(ByteBuffer dst) throws IOException {
+        PeerAddressedByteBuffer src = queue.poll();
+        dst.put(src.getBuffer());
+        return src.getPeer();
     }
 
     @Override
-    public int send(ByteBuffer src, SocketAddress target) throws IOException {
-        return iceSocket.send(src,target,component);
+    public int send(ByteBuffer src, IcePeer target) throws IOException {
+        return iceSocket.sendTo(target,component,src);
+    }
+
+    @Override
+    public void addEventListener(IceEventListener listener) {
+        listeners.add(listener);
+    }
+
+    @Override
+    public void removeEventListener(IceEventListener listener) {
+        listeners.remove(listener);
+    }
+
+    @Override
+    public void stunEvent(StunEvent event) {
+        if (event instanceof net.mc_cubed.icedjava.stun.event.BytesAvailableEvent) {
+            fireEvent(new BytesAvailableEventImpl(this));
+        }
+    }
+
+    private void fireEvent(IceEvent iceEvent) {
+        if (eventBroadcaster != null) {
+            eventBroadcaster.fire(iceEvent);
+        }
+
+        for (IceEventListener listener : listeners) {
+            try {
+                listener.iceEvent(iceEvent);
+            } catch (Exception ex) {
+                log.log(Level.WARNING, "Caught exception during event listener call", ex);
+            }
+        }
     }
 }

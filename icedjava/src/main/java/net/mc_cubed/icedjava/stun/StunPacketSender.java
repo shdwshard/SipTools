@@ -31,6 +31,8 @@ import org.jboss.netty.channel.ChannelFuture;
  */
 public interface StunPacketSender {
 
+    void setMaxRetries(int retries);
+    
     ChannelFuture send(SocketAddress remoteSocket, StunPacket packet) throws IOException;
 
     ChannelFuture send(InetAddress addr, int port, StunPacket packet) throws IOException;

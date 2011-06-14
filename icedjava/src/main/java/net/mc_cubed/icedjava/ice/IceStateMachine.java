@@ -20,7 +20,6 @@
 package net.mc_cubed.icedjava.ice;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -76,14 +75,16 @@ import net.mc_cubed.icedjava.packet.attribute.NullAttribute;
 import net.mc_cubed.icedjava.packet.attribute.RealmAttribute;
 import net.mc_cubed.icedjava.packet.attribute.UsernameAttribute;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
-import net.mc_cubed.icedjava.packet.header.MessageHeader;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
-import net.mc_cubed.icedjava.stun.DatagramStunSocket;
-import net.mc_cubed.icedjava.stun.StunFactory;
 import net.mc_cubed.icedjava.stun.StunReply;
 import net.mc_cubed.icedjava.stun.StunSocket;
 import net.mc_cubed.icedjava.stun.StunUtil;
 import net.mc_cubed.icedjava.stun.TransportType;
+import net.mc_cubed.icedjava.util.ExpiringCache;
+import org.jboss.netty.channel.ChannelHandlerContext;
+import org.jboss.netty.channel.ChannelPipelineCoverage;
+import org.jboss.netty.channel.Channels;
+import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelHandler;
 
 /**
@@ -92,8 +93,9 @@ import org.jboss.netty.channel.SimpleChannelHandler;
  * @author Charles Chappell
  * @since 1.0
  */
-abstract class IceStateMachine extends SimpleChannelHandler implements Runnable, SDPListener,
-        MultiDatagramListener, MultiStunListener, IcePeer {
+@ChannelPipelineCoverage(ChannelPipelineCoverage.ONE)
+abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
+        SDPListener, IcePeer {
 
     /*
      * Class constants
@@ -145,6 +147,23 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
     @AddressDiscoveryMechanism
     Instance<AddressDiscovery> discoveryMechanisms;
     boolean localOnly = false;
+    boolean sendKeepalives = false;
+    ExpiringCache<SocketAddress,IcePeer> socketCache = new ExpiringCache<SocketAddress,IcePeer>();
+
+    @Override
+    protected void finalize() throws Throwable {
+        super.finalize();
+        getThreadpool().shutdownNow();
+        close();
+    }
+
+    public boolean isSendKeepalives() {
+        return sendKeepalives;
+    }
+
+    public void setSendKeepalives(boolean sendKeepalives) {
+        this.sendKeepalives = sendKeepalives;
+    }
 
     /**
      * Sets a flag used for testing only to restrict the scope of the ICE tests
@@ -174,6 +193,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
         }
     }
 
+    @Override
     public long getTieBreaker() {
         return tieBreaker;
     }
@@ -182,10 +202,12 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
         return sdpListener;
     }
 
+    @Override
     public void setSdpListener(SDPListener sdpListener) {
         this.sdpListener = sdpListener;
     }
 
+    @Override
     public Map<IceSocket, List<CandidatePair>> getNominated() {
         return nominated;
     }
@@ -246,6 +268,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
      *
      * @return the global SDP attributes for this state machine
      */
+    @Override
     public List<Attribute> getGlobalAttributes() {
         SdpFactory factory = SdpFactory.getInstance();
         LinkedList<Attribute> retval = new LinkedList<Attribute>();
@@ -359,9 +382,12 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
                     // If there's a triggered check, do it now
                     CandidatePair triggeredPair = triggeredCheckQueue.poll();
                     if (triggeredPair != null) {
-                        log.log(Level.INFO, "TriggeredTest: {0}:{1} ({2}"
-                                + ")" + " -> "
-                                + "{3}:{4}", new Object[]{triggeredPair.getLocalCandidate().getAddress(), triggeredPair.getLocalCandidate().getPort(), triggeredPair.getLocalCandidate().getComponentId(), triggeredPair.getRemoteCandidate().getAddress(), triggeredPair.getRemoteCandidate().getPort()});
+                        log.log(Level.FINE, "TriggeredTest: {0}:{1} ({2}) -> {3}:{4}",
+                                new Object[]{triggeredPair.getLocalCandidate().getAddress(),
+                                    triggeredPair.getLocalCandidate().getPort(),
+                                    triggeredPair.getLocalCandidate().getComponentId(),
+                                    triggeredPair.getRemoteCandidate().getAddress(),
+                                    triggeredPair.getRemoteCandidate().getPort()});
                         runOneTest(triggeredPair.getLocalCandidate().getIceSocket(), triggeredPair);
                         didTest = true;
                     } else {
@@ -404,9 +430,10 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
                         if (!didTest && !checkPairs.isEmpty()) {
                             // Check for pairs still in-progress
                             for (List<CandidatePair> pairs : checkPairs.values()) {
-                                if (pairsInState(pairs, PairState.IN_PROGRESS) > 0) {
+                                int inProgressPairCounts = pairsInState(pairs, PairState.IN_PROGRESS);
+                                if (inProgressPairCounts > 0) {
                                     // End this round
-                                    log.info("Waiting for tests to finish...");
+                                    log.log(Level.FINE, "{0} Waiting for {1} tests to finish...", new Object[]{localUFrag, inProgressPairCounts});
                                     return;
                                 }
                             }
@@ -468,37 +495,48 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
 
             // Upkeep Phase
             if (iceStatus == IceStatus.SUCCESS) {
-                if (new Date().getTime() - lastSent > refreshDelay) {
-                    lastSent = new Date().getTime();
-                    for (List<CandidatePair> pairList : nominated.values()) {
-                        for (CandidatePair pair : pairList) {
-                            /**
-                             * Repeat connectivity checks at a regular interval on
-                             * nominated candidates to keep the candidates available
-                             */
-                            IceReply result = doIceTest(
-                                    pair,
-                                    localUFrag,
-                                    remoteUFrag,
-                                    remotePassword,
-                                    isLocalControlled(),
-                                    PEER_REFLEXIVE_PRIORITY,
-                                    tieBreaker,
-                                    true);
-                            if (result != null) {
-                                log.log(Level.FINEST, "Keepalive: {0}:{1} -> {2}:{3} - {4} - {5}", new Object[]{
-                                            pair.getLocalCandidate().getAddress(),
-                                            pair.getLocalCandidate().getPort(),
-                                            pair.getRemoteCandidate().getAddress(),
-                                            pair.getRemoteCandidate().getPort(),
-                                            pair.getState(),
-                                            (result.isSuccess()) ? result.getMappedAddress() : result.getErrorReason()});
-                            } else {
-                                log.log(Level.WARNING, "Got a null reply from an ICE test during keepalive.  This is abnormal. {0}:{1} -> {2}:{3} - {4}", new Object[]{pair.getLocalCandidate().getAddress(), pair.getLocalCandidate().getPort(), pair.getRemoteCandidate().getAddress(), pair.getRemoteCandidate().getPort(), pair.getState()});
-                            }
+                if (sendKeepalives) {
+                    if (new Date().getTime() - lastSent > refreshDelay) {
+                        lastSent = new Date().getTime();
+                        for (List<CandidatePair> pairList : nominated.values()) {
+                            for (CandidatePair pair : pairList) {
+                                /**
+                                 * Repeat connectivity checks at a regular interval on
+                                 * nominated candidates to keep the candidates available
+                                 */
+                                IceReply result = doIceTest(
+                                        pair,
+                                        localUFrag,
+                                        remoteUFrag,
+                                        remotePassword,
+                                        isLocalControlled(),
+                                        PEER_REFLEXIVE_PRIORITY,
+                                        tieBreaker,
+                                        true);
+                                if (result != null) {
+                                    if (pair == null || pair.getLocalCandidate() == null || pair.getRemoteCandidate() == null) {
+                                        log.log(Level.WARNING, "Got a strange candidate pair: {0}", pair);
+                                    } else {
+                                        log.log(Level.FINEST, "Keepalive: {0}:{1} -> {2}:{3} - {4} - {5}", new Object[]{
+                                                    pair.getLocalCandidate().getAddress(),
+                                                    pair.getLocalCandidate().getPort(),
+                                                    pair.getRemoteCandidate().getAddress(),
+                                                    pair.getRemoteCandidate().getPort(),
+                                                    pair.getState(),
+                                                    (result.isSuccess()) ? result.getMappedAddress() : result.getErrorReason()});
 
+
+                                    }
+                                } else {
+                                    log.log(Level.WARNING, "Got a null reply from an ICE test during keepalive.  This is abnormal. {0}:{1} -> {2}:{3} - {4}", new Object[]{pair.getLocalCandidate().getAddress(), pair.getLocalCandidate().getPort(), pair.getRemoteCandidate().getAddress(), pair.getRemoteCandidate().getPort(), pair.getState()});
+                                }
+
+                            }
                         }
                     }
+                } else {
+                    // Stop executing the ice loop, but don't interrupt already executing processes.
+                    task.cancel(false);
                 }
 
             }
@@ -551,7 +589,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
                                     mappedAddress.getPort(), pair.getLocalCandidate());
                             CandidatePair peerReflexPair = new CandidatePair(local, pair.getRemoteCandidate(), isLocalControlled());
                             peerReflexPair.setState(PairState.SUCCEEDED);
-                            log.log(Level.INFO, "New peer reflexive pair: {0} <-> {1}", new Object[]{peerReflexPair.getLocalCandidate().getSocketAddress(), peerReflexPair.getRemoteCandidate().getSocketAddress()});
+                            log.log(Level.FINE, "New peer reflexive pair: {0} <-> {1}", new Object[]{peerReflexPair.getLocalCandidate().getSocketAddress(), peerReflexPair.getRemoteCandidate().getSocketAddress()});
 
                             checkPairs.get(socket).add(peerReflexPair);
                         } else {
@@ -622,6 +660,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
 
     }
 
+    @Override
     public synchronized void start() {
         if (task == null || task.isDone() == true) {
             iceStatus = IceStatus.IN_PROGRESS;
@@ -657,6 +696,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
     /**
      * @return the sdpTimeout
      */
+    @Override
     public boolean isSdpTimeout() {
         return sdpTimeout;
     }
@@ -664,11 +704,26 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
     /**
      * @param sdpTimeout the sdpTimeout to set
      */
+    @Override
     public void setSdpTimeout(boolean sdpTimeout) {
         this.sdpTimeout = sdpTimeout;
     }
 
     protected abstract Map<String, IcePeer> getPeerMap();
+
+    @Override
+    public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
+        if (e.getMessage() instanceof StunPacket) {
+            StunPacket stunPacket = (StunPacket) e.getMessage();
+            switch (stunPacket.getMessageClass()) {
+                case REQUEST:
+                case INDICATION:
+                    processPacket(stunPacket, e.getRemoteAddress(), ctx);
+                    return;
+            }
+        }
+        super.messageReceived(ctx, e);
+    }
 
     /**
      * Stun/ICE packet processing
@@ -677,30 +732,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
      * @param source The source channel, since one ICE channel may have many StunSockets
      * @return Whether the packet was processed by STUN/ICE.
      */
-    @Override
-    public boolean processPacket(DatagramPacket p, DatagramStunSocket source) {
-        StunFactory stunFactory = StunFactory.getInstance();
-        StunPacket packet;
-        if (!MessageHeader.isRfc5389StunPacket(p)) {
-            log.log(Level.FINEST, "Packet is not a STUN packet, "
-                    + "passing along to DatagramListener");
-            return false;
-        }
-
-        try {
-            packet = stunFactory.processDatagram(p,
-                    new IcePeerAuthenticator(getPeerMap().values()));
-        } catch (Throwable ex) {
-            log.log(Level.FINE, "Error processing packet as STUN packet, "
-                    + "passing along to DatagramListener", ex);
-            return false;
-        }
-
-        return processPacket(packet, p.getSocketAddress(), source);
-    }
-
-    @Override
-    public boolean processPacket(StunPacket packet, SocketAddress sourceAddress, DatagramStunSocket source) {
+    public boolean processPacket(StunPacket packet, SocketAddress sourceAddress, ChannelHandlerContext ctx) {
         Map<AttributeType, net.mc_cubed.icedjava.packet.attribute.Attribute> attrMap =
                 new HashMap<AttributeType, net.mc_cubed.icedjava.packet.attribute.Attribute>();
         // Extract the essential attributes we need
@@ -806,11 +838,9 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
                     response.getAttributes().add(AttributeFactory.createIntegrityAttribute(username, realm, fromPeer.getRemotePassword()));
                 }
                 response.getAttributes().add(AttributeFactory.createFingerprintAttribute());
-                try {
-                    source.send(sourceAddress, response);
-                } catch (IOException ex) {
-                    Logger.getLogger(IceDatagramSocket.class.getName()).log(Level.SEVERE, null, ex);
-                }
+
+                Channels.write(ctx.getChannel(), response, sourceAddress);
+
                 log.warning("Peer will switch roles");
                 return true;
             }
@@ -825,11 +855,11 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
         if (attrMap.containsKey(AttributeType.USE_CANDIDATE)) {
             // Nominate this candidate with the peer
             ((IcePeerImpl) fromPeer).setUseCandidate(
-                    (InetSocketAddress) source.getLocalSocketAddress(),
+                    (InetSocketAddress) ctx.getChannel().getLocalAddress(),
                     (InetSocketAddress) sourceAddress);
         }
         ((IceStateMachine) fromPeer).remoteTouch(
-                (InetSocketAddress) source.getLocalSocketAddress(),
+                (InetSocketAddress) ctx.getChannel().getLocalAddress(),
                 (InetSocketAddress) sourceAddress);
         // We should reply
         switch (packet.getMessageClass()) {
@@ -854,19 +884,12 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
                     response.getAttributes().add(AttributeFactory.createIntegrityAttribute(username, realm, fromPeer.getRemotePassword()));
                 }
                 response.getAttributes().add(AttributeFactory.createFingerprintAttribute());
-                try {
-                    source.send(sourceAddress, response);
-                } catch (IOException ex) {
-                    Logger.getLogger(IceDatagramSocket.class.getName()).log(Level.SEVERE, null, ex);
-                }
-                break;
-            case SUCCESS:
-            case ERROR:
-                // We should store the error
-                source.storeAndNotify((StunPacket) packet);
+
+                Channels.write(ctx.getChannel(), response, sourceAddress);
+
                 break;
             default:
-                log.log(Level.INFO, "Got a strange packet: {0}", packet);
+                log.log(Level.WARNING, "Got a strange packet: {0}", packet);
         }
         return true;
     }
@@ -899,7 +922,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
      */
     private List<LocalCandidate> collectCandidates(IceSocket iceSocket) {
 
-        log.log(Level.INFO, "Collecting Candidates for peer: {0} on socket {1}", new Object[]{localUFrag, iceSocket});
+        log.log(Level.FINE, "Collecting Candidates for peer: {0} on socket {1}", new Object[]{localUFrag, iceSocket});
         List<LocalCandidate> retval = new LinkedList<LocalCandidate>();
         for (int componentId = 0; componentId < iceSocket.getComponents(); componentId++) {
             try {
@@ -917,8 +940,8 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
                                 && !address.isLinkLocalAddress()
                                 && !address.isAnyLocalAddress()
                                 && !address.isMulticastAddress()) {
-                            StunSocket socket = StunUtil.getStunSocket(new InetSocketAddress(address, 0),this);
-                            //socket.setMaxRetries(4);
+                            StunSocket socket = StunUtil.getCustomStunPipeline(new InetSocketAddress(address, 0), this);
+                            socket.setMaxRetries(4);
                             retval.add(new LocalCandidate(
                                     this,
                                     iceSocket,
@@ -946,7 +969,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
                             // Add additional candidates to the list
                             retval.addAll(discoveryMechanism.getCandidates(retval));
                         } catch (Exception ex) {
-                            log.log(Level.INFO, "Exception during address discovery.", ex);
+                            log.log(Level.WARNING, "Exception during address discovery.", ex);
                         }
                     }
                 } else {
@@ -1125,7 +1148,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
     @Override
     public void updateMedia(final Connection conn, final List<Attribute> iceAttributes, final List<MediaDescription> iceMedias)
             throws SdpParseException {
-        log.log(Level.INFO, "SDP Update to {0}\n{1}\n{2}", new Object[]{localUFrag, iceAttributes, iceMedias});
+        log.log(Level.FINE, "SDP Update to {0}\n{1}\n{2}", new Object[]{localUFrag, iceAttributes, iceMedias});
         getThreadpool().execute(new Runnable() {
 
             @Override
@@ -1284,6 +1307,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
      *
      * @return
      */
+    @Override
     public String getRemotePassword() {
         return remotePassword;
     }
@@ -1293,6 +1317,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
      *
      * @param remotePassword
      */
+    @Override
     public void setRemotePassword(String remotePassword) {
         this.remotePassword = remotePassword;
     }
@@ -1302,6 +1327,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
      *
      * @return
      */
+    @Override
     public String getRemoteUFrag() {
         return remoteUFrag;
     }
@@ -1311,6 +1337,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
      *
      * @param remoteUFrag
      */
+    @Override
     public void setRemoteUFrag(String remoteUFrag) {
         this.remoteUFrag = remoteUFrag;
     }
@@ -1320,6 +1347,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
      *
      * @return the state of the Local Controlled flag
      */
+    @Override
     public boolean isLocalControlled() {
         return localRole == AgentRole.CONTROLLING;
     }
@@ -1347,6 +1375,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
      *
      * @param localControl the new localControl flag
      */
+    @Override
     public synchronized void setLocalControlled(boolean localControl) {
         // Need to change the local role, this requires a bit of work
         if (isLocalControlled() != localControl) {
@@ -1386,6 +1415,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
      * 
      * @return the current status of ICE processing
      */
+    @Override
     public IceStatus getStatus() {
         checkStatus();
 
@@ -1645,6 +1675,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
      * @return A list of MediaDescriptions associated with this state machine
      * @throws SdpException
      */
+    @Override
     public List<MediaDescription> getMediaDescriptions() throws SdpException {
         return getMediaDescriptions(false);
     }
@@ -1768,6 +1799,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
      * getMediaDescriptions() instead
      */
     @Deprecated
+    @Override
     public SessionDescription createOffer() throws SdpException {
         SdpFactory factory = SdpFactory.getInstance();
 
@@ -1883,7 +1915,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
     void sendTo(IceSocket socket, short channel, ByteBuffer buf) {
         if (nominated.containsKey(socket) && nominated.get(socket).size() > channel) {
             CandidatePair pair = nominated.get(socket).get(channel);
-            pair.getLocalCandidate().socket.send(buf,pair.remoteCandidate.getSocketAddress());
+            pair.getLocalCandidate().socket.send(buf, pair.remoteCandidate.getSocketAddress());
         }
     }
 
@@ -1918,6 +1950,28 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
         }
 
         return retval;
+    }
+
+    IcePeer translateSocketAddressToPeer(SocketAddress address,IceSocket socket, short componentId) {
+        if (socketCache.containsKey(address)) {
+            return socketCache.get(address);
+        } else {
+            IcePeer peer = null;
+            for (IcePeer checkPeer : getPeerMap().values()) {
+                if (checkPeer.getNominated().get(socket) != null && 
+                        checkPeer.getNominated().get(socket).size() > componentId) {
+                    CandidatePair pair = checkPeer.getNominated().get(socket).get(componentId);
+                    if (pair.getRemoteCandidate().getSocketAddress().equals(address)) {
+                        peer = checkPeer;
+                        break;
+                    }
+                }
+            }
+            if (peer != null) {
+                socketCache.admit(address,peer);
+            }
+            return peer;
+        }
     }
 
     public enum AgentRole {
@@ -2039,6 +2093,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
 
     }
 
+    @Override
     public void close() {
         // Stop any ongoing ICE processing
         stop();
@@ -2057,6 +2112,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
 
     }
 
+    @Override
     public synchronized void doReset(final boolean localControl) {
         // Stop all running tasks
         //task.cancel(false);
@@ -2104,6 +2160,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
 
     }
 
+    @Override
     public String getLocalPassword() {
         return localPassword;
 
@@ -2116,6 +2173,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
 
     }
 
+    @Override
     public String getLocalUFrag() {
         return localUFrag;
 
@@ -2138,41 +2196,22 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
         return stunServer;
 
     }
-    Map<IceSocket, List<IceSocketChannel>> channels;
+    Map<IceSocket, List<IceSocketChannel>> channels = new HashMap<IceSocket,List<IceSocketChannel>>();
 
+    @Override
     public List<IceSocketChannel> getChannels(final IceSocket socket) {
         if (!channels.containsKey(socket) && nominated.containsKey(socket)) {
             LinkedList<IceSocketChannel> channelList = new LinkedList<IceSocketChannel>();
-            for (short i = (short) 0; i < nominated.get(socket).size(); i++) {
-                
-                final short channelNumber = i;
-                channelList.add(new AbstractIceSocketChannel(this) {
-
-                    @Override
-                    public int read(ByteBuffer bb) throws IOException {
-                        return socket.read(bb, channelNumber);                        
-                    }
-
-                    @Override
-                    public int write(ByteBuffer bb) throws IOException {
-                        return socket.write(bb, channelNumber);
-                    }
-
-                    @Override
-                    public SocketAddress receive(ByteBuffer dst) throws IOException {
-                        return socket.receive(dst, channelNumber);
-                    }
-
-                    @Override
-                    public int send(ByteBuffer src, SocketAddress target) throws IOException {
-                        return socket.send(src, target,channelNumber);
-                    }
-                });
+            for (short component = (short) 0; component < nominated.get(socket).size(); component++) {
+                channelList.add(new AbstractIceSocketChannel(this,socket,component));
+            }
+            List<LocalCandidate> localCandidates = getLocalCandidates(socket);
+            for (LocalCandidate candidate : localCandidates) {
+                candidate.socket.registerStunEventListener((AbstractIceSocketChannel)channelList.get(candidate.getComponentId()));
             }
             channels.put(socket, channelList);
         }
 
         return channels.get(socket);
     }
-    
 }

@@ -22,9 +22,11 @@ package net.mc_cubed.icedjava.ice;
 import java.awt.GraphicsEnvironment;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.net.DatagramPacket;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
 import java.util.Date;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.sdp.MediaDescription;
 import javax.sdp.SdpException;
 import javax.sdp.SdpFactory;
@@ -32,6 +34,10 @@ import javax.swing.SwingUtilities;
 import junit.framework.Assert;
 import junit.framework.TestCase;
 import net.mc_cubed.icedjava.ice.IceStateMachine.AgentRole;
+import net.mc_cubed.icedjava.ice.event.BytesAvailableEvent;
+import net.mc_cubed.icedjava.ice.event.IceEvent;
+import net.mc_cubed.icedjava.ice.event.IceEventListener;
+import net.mc_cubed.icedjava.stun.StunUtil;
 
 /**
  *
@@ -68,6 +74,9 @@ public class LocalICETest extends TestCase {
             form = null;
         }
 
+        IcePeerImpl localPeer = null;
+        IcePeerImpl remotePeer = null;
+
         try {
             MediaDescription[] medias = new MediaDescription[2];
             SdpFactory factory = SdpFactory.getInstance();
@@ -80,11 +89,11 @@ public class LocalICETest extends TestCase {
                 iceFactory.createIceSocket(medias[1].getMedia())};
 
             // Create a local peer for a yet unspecified remote peer
-            IcePeerImpl localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
+            localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
             // Set local only mode
             localPeer.setLocalOnly(true);
             // Create a "remote" peer
-            IcePeerImpl remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLED, remoteSockets);
+            remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLED, remoteSockets);
             // Set local only mode
             remotePeer.setLocalOnly(true);
 
@@ -136,9 +145,9 @@ public class LocalICETest extends TestCase {
             }
 
             Assert.assertEquals(IceStatus.SUCCESS, localPeer.getStatus());
-            System.out.println(localPeer.createOffer());
+            //System.out.println(localPeer.createOffer());
             Assert.assertEquals(IceStatus.SUCCESS, remotePeer.getStatus());
-            System.out.println(remotePeer.createOffer());
+            //System.out.println(remotePeer.createOffer());
 
             // Get the nominated connection
             Assert.assertNotNull(localPeer.getNominated());
@@ -148,18 +157,28 @@ public class LocalICETest extends TestCase {
 
             final byte[] data = new byte[30];
             // Test the actual data connection
-            remotePeer.setDatagramListener(new MultiDatagramListener() {
+            remotePeer.getChannels(remoteSockets[0]).get(0).addEventListener(new IceEventListener() {
 
                 @Override
-                public void deliverDatagram(DatagramPacket p, IceSocket source) {
-                    System.out.println("Received Datagram: " + new String(p.getData(), p.getOffset(), p.getLength()));
-                    System.arraycopy(p.getData(), p.getOffset(), data, 0, p.getLength());
+                public void iceEvent(IceEvent event) {
+                    if (event instanceof BytesAvailableEvent) {
+                        try {
+                            BytesAvailableEvent bytesEvent = (BytesAvailableEvent) event;
+                            ByteBuffer buffer = ByteBuffer.allocate(StunUtil.MAX_PACKET_SIZE);
+                            bytesEvent.getSocketChannel().read(buffer);
+                            System.out.println("Received Datagram: " + buffer);
+                            System.arraycopy(buffer.array(), buffer.arrayOffset(), data, 0, buffer.remaining());
+                        } catch (IOException ex) {
+                            Logger.getLogger(LocalICETest.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+
+                    }
                 }
             });
 
-            DatagramPacket p = new DatagramPacket("Testing".getBytes(), 0, 7);
-
-            localSockets[0].send(p, (short) 0);
+            ByteBuffer bb = ByteBuffer.allocate(8);
+            bb.put("Testing".getBytes());
+            localSockets[0].write(bb, (short)0);
 
             // Wait for the data to arrive
             Thread.sleep(100);
@@ -167,9 +186,15 @@ public class LocalICETest extends TestCase {
             // Test for the presense of the data
             Assert.assertEquals("Testing", new String(data, 0, 7));
 
-            System.out.println(localPeer.createOffer());
-            System.out.println(remotePeer.createOffer());
+            //System.out.println(localPeer.createOffer());
+            //System.out.println(remotePeer.createOffer());
         } finally {
+            localPeer.setSdpListener(null);
+            remotePeer.setSdpListener(null);
+
+            localPeer.close();
+            remotePeer.close();
+
             if (form != null) {
                 form.setVisible(false);
             }
@@ -192,6 +217,9 @@ public class LocalICETest extends TestCase {
             form = null;
         }
 
+        IcePeerImpl localPeer = null;
+        IcePeerImpl remotePeer = null;
+
         try {
             MediaDescription[] medias = new MediaDescription[2];
             SdpFactory factory = SdpFactory.getInstance();
@@ -204,13 +232,13 @@ public class LocalICETest extends TestCase {
                 iceFactory.createIceSocket(medias[1].getMedia())};
 
             // Create a local peer for a yet unspecified remote peer
-            IcePeerImpl localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
+            localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
             // Set local only mode
             localPeer.setLocalOnly(true);
             // Set Aggressive nomination on the controlling peer
             localPeer.setNomination(IceStateMachine.NominationType.AGGRESSIVE);
             // Create a "remote" peer
-            IcePeerImpl remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLED, remoteSockets);
+            remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLED, remoteSockets);
             // Set local only mode
             remotePeer.setLocalOnly(true);
 
@@ -262,9 +290,9 @@ public class LocalICETest extends TestCase {
             }
 
             Assert.assertEquals(IceStatus.SUCCESS, localPeer.getStatus());
-            System.out.println(localPeer.createOffer());
+            //System.out.println(localPeer.createOffer());
             Assert.assertEquals(IceStatus.SUCCESS, remotePeer.getStatus());
-            System.out.println(remotePeer.createOffer());
+            //System.out.println(remotePeer.createOffer());
 
             // Get the nominated connection
             Assert.assertNotNull(localPeer.getNominated());
@@ -274,18 +302,29 @@ public class LocalICETest extends TestCase {
 
             final byte[] data = new byte[30];
             // Test the actual data connection
-            remotePeer.setDatagramListener(new MultiDatagramListener() {
+            // Test the actual data connection
+            remotePeer.getChannels(remoteSockets[0]).get(0).addEventListener(new IceEventListener() {
 
                 @Override
-                public void deliverDatagram(DatagramPacket p, IceSocket source) {
-                    System.out.println("Received Datagram: " + new String(p.getData(), p.getOffset(), p.getLength()));
-                    System.arraycopy(p.getData(), p.getOffset(), data, 0, p.getLength());
+                public void iceEvent(IceEvent event) {
+                    if (event instanceof BytesAvailableEvent) {
+                        try {
+                            BytesAvailableEvent bytesEvent = (BytesAvailableEvent) event;
+                            ByteBuffer buffer = ByteBuffer.allocate(StunUtil.MAX_PACKET_SIZE);
+                            bytesEvent.getSocketChannel().read(buffer);
+                            System.out.println("Received Datagram: " + buffer);
+                            System.arraycopy(buffer.array(), buffer.arrayOffset(), data, 0, buffer.remaining());
+                        } catch (IOException ex) {
+                            Logger.getLogger(LocalICETest.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+
+                    }
                 }
             });
 
-            DatagramPacket p = new DatagramPacket("Testing".getBytes(), 0, 7);
-
-            localSockets[0].send(p, (short) 0);
+            ByteBuffer bb = ByteBuffer.allocate(8);
+            bb.put("Testing".getBytes());
+            localSockets[0].write(bb, (short)0);
 
             // Wait for the data to arrive
             Thread.sleep(100);
@@ -293,9 +332,15 @@ public class LocalICETest extends TestCase {
             // Test for the presense of the data
             Assert.assertEquals("Testing", new String(data, 0, 7));
 
-            System.out.println(localPeer.createOffer());
-            System.out.println(remotePeer.createOffer());
+            //System.out.println(localPeer.createOffer());
+            //System.out.println(remotePeer.createOffer());
         } finally {
+            localPeer.setSdpListener(null);
+            remotePeer.setSdpListener(null);
+
+            localPeer.close();
+            remotePeer.close();
+
             if (form != null) {
                 form.setVisible(false);
             }
@@ -317,6 +362,10 @@ public class LocalICETest extends TestCase {
         } else {
             form = null;
         }
+
+        IcePeerImpl localPeer = null;
+        IcePeerImpl remotePeer = null;
+
         try {
             MediaDescription[] medias = new MediaDescription[2];
             SdpFactory factory = SdpFactory.getInstance();
@@ -329,11 +378,11 @@ public class LocalICETest extends TestCase {
                 iceFactory.createIceSocket(medias[1].getMedia())};
 
             // Create a local peer for a yet unspecified remote peer
-            IcePeerImpl localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
+            localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
             // Set local only mode
             localPeer.setLocalOnly(true);
             // Create a "remote" peer
-            IcePeerImpl remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLING, remoteSockets);
+            remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLING, remoteSockets);
             // Set local only mode
             remotePeer.setLocalOnly(true);
 
@@ -368,8 +417,8 @@ public class LocalICETest extends TestCase {
 
 
             long startTime = new Date().getTime();
-            // Wait for the state machines to die, or 60 seconds to pass
-            while (new Date().getTime() - startTime < 60000 && (localPeer.getStatus() == IceStatus.IN_PROGRESS || remotePeer.getStatus() == IceStatus.IN_PROGRESS)) {
+            // Wait for the state machines to die, or 30 seconds to pass
+            while (new Date().getTime() - startTime < 30000 && (localPeer.getStatus() == IceStatus.IN_PROGRESS || remotePeer.getStatus() == IceStatus.IN_PROGRESS)) {
                 Thread.sleep(500);
 
                 if (form != null) {
@@ -385,9 +434,9 @@ public class LocalICETest extends TestCase {
             }
 
             Assert.assertEquals(IceStatus.SUCCESS, localPeer.getStatus());
-            System.out.println(localPeer.createOffer());
+            //System.out.println(localPeer.createOffer());
             Assert.assertEquals(IceStatus.SUCCESS, remotePeer.getStatus());
-            System.out.println(remotePeer.createOffer());
+            //System.out.println(remotePeer.createOffer());
 
             // Get the nominated connection
             Assert.assertNotNull(localPeer.getNominated());
@@ -397,18 +446,29 @@ public class LocalICETest extends TestCase {
 
             final byte[] data = new byte[30];
             // Test the actual data connection
-            remotePeer.setDatagramListener(new MultiDatagramListener() {
+            // Test the actual data connection
+            remotePeer.getChannels(remoteSockets[0]).get(0).addEventListener(new IceEventListener() {
 
                 @Override
-                public void deliverDatagram(DatagramPacket p, IceSocket source) {
-                    System.out.println("Received Datagram: " + new String(p.getData(), p.getOffset(), p.getLength()));
-                    System.arraycopy(p.getData(), p.getOffset(), data, 0, p.getLength());
+                public void iceEvent(IceEvent event) {
+                    if (event instanceof BytesAvailableEvent) {
+                        try {
+                            BytesAvailableEvent bytesEvent = (BytesAvailableEvent) event;
+                            ByteBuffer buffer = ByteBuffer.allocate(StunUtil.MAX_PACKET_SIZE);
+                            bytesEvent.getSocketChannel().read(buffer);
+                            System.out.println("Received Datagram: " + buffer);
+                            System.arraycopy(buffer.array(), buffer.arrayOffset(), data, 0, buffer.remaining());
+                        } catch (IOException ex) {
+                            Logger.getLogger(LocalICETest.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+
+                    }
                 }
             });
 
-            DatagramPacket p = new DatagramPacket("Testing".getBytes(), 0, 7);
-
-            localSockets[0].send(p, (short) 0);
+            ByteBuffer bb = ByteBuffer.allocate(8);
+            bb.put("Testing".getBytes());
+            localSockets[0].write(bb, (short)0);
 
             // Wait for the data to arrive
             Thread.sleep(100);
@@ -416,9 +476,16 @@ public class LocalICETest extends TestCase {
             // Test for the presense of the data
             Assert.assertEquals("Testing", new String(data, 0, 7));
 
-            System.out.println(localPeer.createOffer());
-            System.out.println(remotePeer.createOffer());
+            //System.out.println(localPeer.createOffer());
+            //System.out.println(remotePeer.createOffer());
+
         } finally {
+            localPeer.setSdpListener(null);
+            remotePeer.setSdpListener(null);
+
+            localPeer.close();
+            remotePeer.close();
+
             if (form != null) {
                 form.setVisible(false);
             }
@@ -427,6 +494,7 @@ public class LocalICETest extends TestCase {
 
     public void testAggressiveICESocketConflict() throws SocketException, SdpException, InterruptedException, IOException, InvocationTargetException {
         final IceNegociationProgressForm form;
+
         if (!GraphicsEnvironment.isHeadless()) {
             IceNegociationProgressForm iceForm = null;
             try {
@@ -439,6 +507,10 @@ public class LocalICETest extends TestCase {
         } else {
             form = null;
         }
+
+        IcePeerImpl localPeer = null;
+        IcePeerImpl remotePeer = null;
+
         try {
             MediaDescription[] medias = new MediaDescription[2];
             SdpFactory factory = SdpFactory.getInstance();
@@ -451,13 +523,13 @@ public class LocalICETest extends TestCase {
                 iceFactory.createIceSocket(medias[1].getMedia())};
 
             // Create a local peer for a yet unspecified remote peer
-            IcePeerImpl localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
+            localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
             // Set local only mode
             localPeer.setLocalOnly(true);
             // Set Aggressive Nomination on the local peer
             localPeer.setNomination(IceStateMachine.NominationType.AGGRESSIVE);
             // Create a "remote" peer
-            IcePeerImpl remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLING, remoteSockets);
+            remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLING, remoteSockets);
             // Set local only mode
             remotePeer.setLocalOnly(true);
             // Set Aggressive nomination on the remote peer
@@ -511,9 +583,9 @@ public class LocalICETest extends TestCase {
             }
 
             Assert.assertEquals(IceStatus.SUCCESS, localPeer.getStatus());
-            System.out.println(localPeer.createOffer());
+            //System.out.println(localPeer.createOffer());
             Assert.assertEquals(IceStatus.SUCCESS, remotePeer.getStatus());
-            System.out.println(remotePeer.createOffer());
+            //System.out.println(remotePeer.createOffer());
 
             // Get the nominated connection
             Assert.assertNotNull(localPeer.getNominated());
@@ -523,18 +595,29 @@ public class LocalICETest extends TestCase {
 
             final byte[] data = new byte[30];
             // Test the actual data connection
-            remotePeer.setDatagramListener(new MultiDatagramListener() {
+            // Test the actual data connection
+            remotePeer.getChannels(remoteSockets[0]).get(0).addEventListener(new IceEventListener() {
 
                 @Override
-                public void deliverDatagram(DatagramPacket p, IceSocket source) {
-                    System.out.println("Received Datagram: " + new String(p.getData(), p.getOffset(), p.getLength()));
-                    System.arraycopy(p.getData(), p.getOffset(), data, 0, p.getLength());
+                public void iceEvent(IceEvent event) {
+                    if (event instanceof BytesAvailableEvent) {
+                        try {
+                            BytesAvailableEvent bytesEvent = (BytesAvailableEvent) event;
+                            ByteBuffer buffer = ByteBuffer.allocate(StunUtil.MAX_PACKET_SIZE);
+                            bytesEvent.getSocketChannel().read(buffer);
+                            System.out.println("Received Datagram: " + buffer);
+                            System.arraycopy(buffer.array(), buffer.arrayOffset(), data, 0, buffer.remaining());
+                        } catch (IOException ex) {
+                            Logger.getLogger(LocalICETest.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+
+                    }
                 }
             });
 
-            DatagramPacket p = new DatagramPacket("Testing".getBytes(), 0, 7);
-
-            localSockets[0].send(p, (short) 0);
+            ByteBuffer bb = ByteBuffer.allocate(8);
+            bb.put("Testing".getBytes());
+            localSockets[0].write(bb, (short)0);
 
             // Wait for the data to arrive
             Thread.sleep(100);
@@ -542,9 +625,16 @@ public class LocalICETest extends TestCase {
             // Test for the presense of the data
             Assert.assertEquals("Testing", new String(data, 0, 7));
 
-            System.out.println(localPeer.createOffer());
-            System.out.println(remotePeer.createOffer());
+            //System.out.println(localPeer.createOffer());
+            //System.out.println(remotePeer.createOffer());
+
         } finally {
+            localPeer.setSdpListener(null);
+            remotePeer.setSdpListener(null);
+
+            localPeer.close();
+            remotePeer.close();
+
             if (form != null) {
                 form.setVisible(false);
             }

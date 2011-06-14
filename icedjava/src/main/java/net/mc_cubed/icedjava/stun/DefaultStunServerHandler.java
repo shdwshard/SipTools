@@ -32,6 +32,7 @@ import java.util.LinkedList;
 import java.util.List;
 import net.mc_cubed.icedjava.packet.StunPacket;
 import net.mc_cubed.icedjava.packet.attribute.AttributeFactory;
+import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipelineCoverage;
 import org.jboss.netty.channel.Channels;
@@ -43,12 +44,12 @@ import org.jboss.netty.channel.SimpleChannelHandler;
  * @author Charles Chappell
  */
 @ChannelPipelineCoverage(ChannelPipelineCoverage.ONE)
-public class GenericStunListener extends SimpleChannelHandler {
+public class DefaultStunServerHandler extends SimpleChannelHandler {
 
     static SoftwareAttribute mySoftwareAttribute = AttributeFactory.createSoftwareAttribute(
             "IcedJava 1.0 - Copyright MC Cubed, Inc. of Saitama, Japan, released under LGPL v3.0");
 
-    public GenericStunListener() {
+    public DefaultStunServerHandler() {
     }
 
     @Override
@@ -57,10 +58,10 @@ public class GenericStunListener extends SimpleChannelHandler {
             if (processPacket((StunPacket)e.getMessage(), e.getRemoteAddress(),ctx)) {
                 return;
             } else {
-                messageReceived(ctx,e);                
+                super.messageReceived(ctx,e);                
             }
         } else {
-            messageReceived(ctx, e);
+            super.messageReceived(ctx, e);
         }
     }
 
@@ -101,7 +102,8 @@ public class GenericStunListener extends SimpleChannelHandler {
             reply.getAttributes().add(mySoftwareAttribute);
             reply.getAttributes().add(AttributeFactory.createFingerprintAttribute());
 
-            Channels.write(ctx, null, reply, senderAddress);
+            ChannelFuture cf = Channels.future(ctx.getChannel());
+            Channels.write(ctx, cf, reply, senderAddress);
             return false;
         }
 
@@ -123,7 +125,8 @@ public class GenericStunListener extends SimpleChannelHandler {
             reply.getAttributes().add(mySoftwareAttribute);
             reply.getAttributes().add(AttributeFactory.createFingerprintAttribute());
             
-            Channels.write(ctx, null, reply, senderAddress);
+            ChannelFuture cf = Channels.future(ctx.getChannel());
+            Channels.write(ctx, cf, reply, senderAddress);
         }
         return true;
     }

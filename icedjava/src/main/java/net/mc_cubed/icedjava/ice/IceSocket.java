@@ -26,7 +26,6 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import javax.sdp.Media;
 import javax.sdp.SdpException;
-import net.mc_cubed.icedjava.stun.DatagramListener;
 
 /**
  * Represents a generic IceSocket which Peers will be attached to.
@@ -34,7 +33,7 @@ import net.mc_cubed.icedjava.stun.DatagramListener;
  * @author Charles Chappell
  * @since 1.0
  */
-public interface IceSocket extends DatagramListener,IceSocketChannel {
+public interface IceSocket {
 
     //public int getPort();
 
@@ -69,7 +68,7 @@ public interface IceSocket extends DatagramListener,IceSocketChannel {
      * @throws IOException
      */
     public int receive(DatagramPacket p, short componentId) throws IOException;
-    public SocketAddress receive(ByteBuffer data, short componentId) throws IOException;
+    public IcePeer receive(ByteBuffer data, short componentId) throws IOException;
 
     /**
      * Send a packet on a specific component of this socket
@@ -78,8 +77,8 @@ public interface IceSocket extends DatagramListener,IceSocketChannel {
      * @param componentId
      * @throws IOException
      */
-    public int send(DatagramPacket data, short componentId) throws IOException;
-    public int send(ByteBuffer data, SocketAddress target, short componentId) throws IOException;
+    public int send(ByteBuffer data, short componentId) throws IOException;
+    public int sendTo(IcePeer peer, short componentId, ByteBuffer buffer) throws IOException;
 
     /**
      * Get the number of components making up this flow
@@ -95,9 +94,17 @@ public interface IceSocket extends DatagramListener,IceSocketChannel {
      * @return true if no peers are connected, false otherwise.
      */
     public boolean isClosed();
+    
+    public boolean isOpen();
+    
+    public void close() throws IOException;
 
     public int write(ByteBuffer data, short componentId) throws IOException;
     
     public int read(ByteBuffer data, short componentId) throws IOException;
+    
+    public IceSocketChannel[] getSocketChannels();
+    
+    public IceSocketChannel getSocketChannel(short componentId);
 
 }

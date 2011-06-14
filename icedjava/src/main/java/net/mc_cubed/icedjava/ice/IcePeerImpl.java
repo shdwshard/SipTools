@@ -19,7 +19,6 @@
  */
 package net.mc_cubed.icedjava.ice;
 
-import java.net.DatagramPacket;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
@@ -27,6 +26,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import javax.sdp.SdpException;
 import javax.sdp.SdpParseException;
+import org.jboss.netty.channel.ChannelPipelineCoverage;
 
 /**
  * Extends the IceStateMachine and implements the IcePeer interface to form a
@@ -37,13 +37,15 @@ import javax.sdp.SdpParseException;
  * @see IceStateMachine
  * @see IcePeer
  */
-class IcePeerImpl extends IceStateMachine implements MultiDatagramListener, IcePeer {
+@ChannelPipelineCoverage(ChannelPipelineCoverage.ONE)
+class IcePeerImpl extends IceStateMachine implements IcePeer {
 
 
     private ScheduledExecutorService threadpool;
     private final String peerId;
     private Map<String,IcePeer> myPeerMap;
 
+    
     public IcePeerImpl(String peerId, AgentRole agentRole, IceSocket ... sockets) throws SdpException {
         this(peerId, agentRole, null, null, sockets);
     }
@@ -54,16 +56,6 @@ class IcePeerImpl extends IceStateMachine implements MultiDatagramListener, IceP
 
     public IcePeerImpl(IceSocket ... sockets) throws SdpException {
         this(null,AgentRole.CONTROLLING,sockets);
-    }
-
-    private MultiDatagramListener datagramListener;
-
-    public MultiDatagramListener getDatagramListener() {
-        return datagramListener;
-    }
-
-    public void setDatagramListener(MultiDatagramListener datagramListener) {
-        this.datagramListener = datagramListener;
     }
 
     public IcePeerImpl(String peerId, AgentRole agentRole, String uFrag, String password,
@@ -106,17 +98,6 @@ class IcePeerImpl extends IceStateMachine implements MultiDatagramListener, IceP
         this.threadpool = threadpool;
     }
 
-    @Deprecated
-    private int succeededPairs(List<CandidatePair> pairs) {
-        int count = 0;
-        for (CandidatePair pair : pairs) {
-            if (pair.getState() == PairState.SUCCEEDED) {
-                count++;
-            }
-        }
-        return count;
-    }
-
     @Override
     protected Map<String, IcePeer> getPeerMap() {
         if (myPeerMap != null && !myPeerMap.containsKey(getLocalUFrag())) {
@@ -129,15 +110,6 @@ class IcePeerImpl extends IceStateMachine implements MultiDatagramListener, IceP
         }
         return myPeerMap;
         
-    }
-
-    @Override
-    public void deliverDatagram(DatagramPacket p, IceSocket source) {
-        if (datagramListener != null) {
-            datagramListener.deliverDatagram(p, source);
-        } else {
-            source.deliverDatagram(p);
-        }
     }
 
     @Override

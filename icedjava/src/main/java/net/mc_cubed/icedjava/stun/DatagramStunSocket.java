@@ -58,7 +58,7 @@ import org.jboss.netty.channel.SimpleChannelHandler;
 public class DatagramStunSocket extends SimpleChannelHandler implements StunSocket, StunPacketSender, ChannelUpstreamHandler, ChannelDownstreamHandler {
 
     protected Logger log = Logger.getLogger(getClass().getName());
-    ExpiringCache<BigInteger, StunReplyFuture> requestCache = new ExpiringCache<BigInteger, StunReplyFuture>();
+    static ExpiringCache<BigInteger, StunReplyFuture> requestCache = new ExpiringCache<BigInteger, StunReplyFuture>();
     ChannelHandlerContext localContext;
     
     //protected StunListener stunListener;
@@ -194,7 +194,7 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunSock
 
         if (requestFuture != null) {
             requestFuture.setReply(new StunReplyImpl(packet));
-            log.log(Level.INFO, "Setting reply to Stun future: {0}:{1}", new Object[] {packet.getId(),packet});
+            log.log(Level.FINEST, "Setting reply to Stun future: {0}:{1}", new Object[] {packet.getId(),packet});
         } else {
             log.log(Level.INFO, "Got an unexpected reply: {0}", packet);
         }
@@ -241,7 +241,7 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunSock
 
     @Override
     public void close() {
-        localContext.getChannel().close();
+        localContext.getChannel().close().awaitUninterruptibly();
     }
 
     @Override
@@ -301,7 +301,7 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunSock
 
     @Override
     public TransportType getTransportType() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return TransportType.UDP;
     }
 
     @Override

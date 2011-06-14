@@ -70,10 +70,11 @@ public class ExpiringCache<K extends Object, T extends Object> implements Map<K,
 
     @Override
     protected void finalize() throws Throwable {
-        super.finalize();
         if (cacheManager != null) {
             cacheManager.cancel();
+            cacheManager = null;
         }
+        super.finalize();
     }
 
     @SuppressWarnings("unchecked")

@@ -21,7 +21,6 @@ package net.mc_cubed.icedjava.ice;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
-import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import javax.sdp.Media;
@@ -70,27 +69,12 @@ class IceStreamSocket implements IceSocket {
     }
 
     @Override
-    public int send(DatagramPacket data, short componentId) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
     public short getComponents() {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
     public boolean isClosed() {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void deliverDatagram(DatagramPacket p) {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public int send(ByteBuffer data, SocketAddress target, short componentId) throws IOException {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
@@ -105,47 +89,27 @@ class IceStreamSocket implements IceSocket {
     }
 
     @Override
-    public SocketAddress receive(ByteBuffer dst) throws IOException {
+    public IceSocketChannel[] getSocketChannels() {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public int send(ByteBuffer src, SocketAddress target) throws IOException {
+    public IceSocketChannel getSocketChannel(short componentId) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public int read(ByteBuffer bb) throws IOException {
+    public IcePeer receive(ByteBuffer data, short componentId) throws IOException {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public int write(ByteBuffer bb) throws IOException {
+    public int send(ByteBuffer data, short componentId) throws IOException {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public long read(ByteBuffer[] bbs, int i, int i1) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public long read(ByteBuffer[] bbs) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public long write(ByteBuffer[] bbs, int i, int i1) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public long write(ByteBuffer[] bbs) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public SocketAddress receive(ByteBuffer data, short componentId) throws IOException {
+    public int sendTo(IcePeer peer, short componentId, ByteBuffer buffer) throws IOException {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 

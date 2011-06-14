@@ -193,12 +193,12 @@ public class DatagramDemultiplexerSocket extends DatagramStunSocket implements D
 
     @Override
     public void registerStunEventListener(StunEventListener listener) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        listeners.add(listener);
     }
 
     @Override
     public void deregisterStunEventListener(StunEventListener listener) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        listeners.remove(listener);
     }
 
     private void broadcastReceivedMessage() {

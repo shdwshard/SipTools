@@ -34,7 +34,7 @@ import javax.sdp.SessionDescription;
  * @author Charles Chappell
  * @since 0.9
  */
-public interface IcePeer extends SDPListener,MultiDatagramListener {
+public interface IcePeer extends SDPListener {
 
     SessionDescription createOffer() throws SdpException;
 

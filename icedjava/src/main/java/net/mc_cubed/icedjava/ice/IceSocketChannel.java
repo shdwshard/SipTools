@@ -10,6 +10,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
+import net.mc_cubed.icedjava.ice.event.IceEventListener;
 
 /**
  *
@@ -17,7 +18,11 @@ import java.nio.channels.ScatteringByteChannel;
  */
 public interface IceSocketChannel extends ByteChannel, ScatteringByteChannel, GatheringByteChannel {
 
-    SocketAddress receive(ByteBuffer dst) throws IOException;
+    void addEventListener(IceEventListener listener);
 
-    int send(ByteBuffer src, SocketAddress target)throws IOException;
+    void removeEventListener(IceEventListener listener);
+
+    IcePeer receive(ByteBuffer dst) throws IOException;
+
+    int send(ByteBuffer src, IcePeer target) throws IOException;
 }
