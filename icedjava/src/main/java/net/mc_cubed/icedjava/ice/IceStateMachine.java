@@ -26,7 +26,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketAddress;
-import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
@@ -81,11 +80,9 @@ import net.mc_cubed.icedjava.stun.StunSocket;
 import net.mc_cubed.icedjava.stun.StunUtil;
 import net.mc_cubed.icedjava.stun.TransportType;
 import net.mc_cubed.icedjava.util.ExpiringCache;
-import org.jboss.netty.channel.ChannelHandlerContext;
-import org.jboss.netty.channel.ChannelPipelineCoverage;
-import org.jboss.netty.channel.Channels;
-import org.jboss.netty.channel.MessageEvent;
-import org.jboss.netty.channel.SimpleChannelHandler;
+import org.glassfish.grizzly.filterchain.BaseFilter;
+import org.glassfish.grizzly.filterchain.FilterChainContext;
+import org.glassfish.grizzly.filterchain.NextAction;
 
 /**
  * Implements the ICE state machine
@@ -93,8 +90,7 @@ import org.jboss.netty.channel.SimpleChannelHandler;
  * @author Charles Chappell
  * @since 1.0
  */
-@ChannelPipelineCoverage(ChannelPipelineCoverage.ONE)
-abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
+abstract class IceStateMachine extends BaseFilter implements Runnable,
         SDPListener, IcePeer {
 
     /*
@@ -148,7 +144,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
     Instance<AddressDiscovery> discoveryMechanisms;
     boolean localOnly = false;
     boolean sendKeepalives = false;
-    ExpiringCache<SocketAddress,IcePeer> socketCache = new ExpiringCache<SocketAddress,IcePeer>();
+    ExpiringCache<SocketAddress, IcePeer> socketCache = new ExpiringCache<SocketAddress, IcePeer>();
 
     @Override
     protected void finalize() throws Throwable {
@@ -712,17 +708,17 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
     protected abstract Map<String, IcePeer> getPeerMap();
 
     @Override
-    public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
-        if (e.getMessage() instanceof StunPacket) {
-            StunPacket stunPacket = (StunPacket) e.getMessage();
+    public NextAction handleRead(FilterChainContext ctx) throws IOException {
+        if (ctx.getMessage() instanceof StunPacket) {
+            StunPacket stunPacket = (StunPacket) ctx.getMessage();
             switch (stunPacket.getMessageClass()) {
                 case REQUEST:
                 case INDICATION:
-                    processPacket(stunPacket, e.getRemoteAddress(), ctx);
-                    return;
+                    processPacket(stunPacket, (SocketAddress)ctx.getAddress(), ctx);
+                    return ctx.getStopAction();
             }
         }
-        super.messageReceived(ctx, e);
+        return super.handleRead(ctx);
     }
 
     /**
@@ -732,7 +728,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
      * @param source The source channel, since one ICE channel may have many StunSockets
      * @return Whether the packet was processed by STUN/ICE.
      */
-    public boolean processPacket(StunPacket packet, SocketAddress sourceAddress, ChannelHandlerContext ctx) {
+    public boolean processPacket(StunPacket packet, SocketAddress sourceAddress, FilterChainContext ctx) throws IOException {
         Map<AttributeType, net.mc_cubed.icedjava.packet.attribute.Attribute> attrMap =
                 new HashMap<AttributeType, net.mc_cubed.icedjava.packet.attribute.Attribute>();
         // Extract the essential attributes we need
@@ -839,7 +835,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
                 }
                 response.getAttributes().add(AttributeFactory.createFingerprintAttribute());
 
-                Channels.write(ctx.getChannel(), response, sourceAddress);
+                ctx.write(sourceAddress, response, null);
 
                 log.warning("Peer will switch roles");
                 return true;
@@ -855,11 +851,11 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
         if (attrMap.containsKey(AttributeType.USE_CANDIDATE)) {
             // Nominate this candidate with the peer
             ((IcePeerImpl) fromPeer).setUseCandidate(
-                    (InetSocketAddress) ctx.getChannel().getLocalAddress(),
+                    (InetSocketAddress) ctx.getConnection().getLocalAddress(),
                     (InetSocketAddress) sourceAddress);
         }
         ((IceStateMachine) fromPeer).remoteTouch(
-                (InetSocketAddress) ctx.getChannel().getLocalAddress(),
+                (InetSocketAddress) ctx.getConnection().getLocalAddress(),
                 (InetSocketAddress) sourceAddress);
         // We should reply
         switch (packet.getMessageClass()) {
@@ -885,7 +881,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
                 }
                 response.getAttributes().add(AttributeFactory.createFingerprintAttribute());
 
-                Channels.write(ctx.getChannel(), response, sourceAddress);
+                ctx.write(sourceAddress, response, null);
 
                 break;
             default:
@@ -952,7 +948,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
                     }
 
                 }
-            } catch (SocketException ex) {
+            } catch (IOException ex) {
                 Logger.getLogger(IceDatagramSocket.class.getName()).log(
                         Level.SEVERE, null, ex);
             }
@@ -1366,8 +1362,14 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
      * @param sockets
      */
     public synchronized void setIceSockets(IceSocket[] sockets) {
+        for (IceSocket socket : iceSockets) {
+            ((IceDatagramSocket)socket).removePeer(this);
+        }
         iceSockets.clear();
         iceSockets.addAll(Arrays.asList(sockets));
+        for (IceSocket socket : iceSockets) {
+            ((IceDatagramSocket)socket).addPeer(this);
+        }
     }
 
     /**
@@ -1912,7 +1914,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
      * @param channel channel on channel to send to
      * @param buf data to send
      */
-    void sendTo(IceSocket socket, short channel, ByteBuffer buf) {
+    void sendTo(IceSocket socket, short channel, ByteBuffer buf) throws IOException {
         if (nominated.containsKey(socket) && nominated.get(socket).size() > channel) {
             CandidatePair pair = nominated.get(socket).get(channel);
             pair.getLocalCandidate().socket.send(buf, pair.remoteCandidate.getSocketAddress());
@@ -1952,14 +1954,15 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
         return retval;
     }
 
-    IcePeer translateSocketAddressToPeer(SocketAddress address,IceSocket socket, short componentId) {
+    @Deprecated
+    IcePeer translateSocketAddressToPeer(SocketAddress address, IceSocket socket, short componentId) {
         if (socketCache.containsKey(address)) {
             return socketCache.get(address);
         } else {
             IcePeer peer = null;
             for (IcePeer checkPeer : getPeerMap().values()) {
-                if (checkPeer.getNominated().get(socket) != null && 
-                        checkPeer.getNominated().get(socket).size() > componentId) {
+                if (checkPeer.getNominated().get(socket) != null
+                        && checkPeer.getNominated().get(socket).size() > componentId) {
                     CandidatePair pair = checkPeer.getNominated().get(socket).get(componentId);
                     if (pair.getRemoteCandidate().getSocketAddress().equals(address)) {
                         peer = checkPeer;
@@ -1968,7 +1971,7 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
                 }
             }
             if (peer != null) {
-                socketCache.admit(address,peer);
+                socketCache.admit(address, peer);
             }
             return peer;
         }
@@ -2101,15 +2104,24 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
         for (List<LocalCandidate> localCandidates : socketCandidateMap.values()) {
             for (LocalCandidate localCandidate : localCandidates) {
                 try {
-                    localCandidate.socket.close();
+                    if (localCandidate.socket.isOpen()) {
+                        localCandidate.socket.close();
+                    }
                 } catch (IOException ex) {
                     Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
         }
+        // Release references
         socketCandidateMap.clear();
-
-
+        channels.clear();
+        checkPairs.clear();
+        iceSockets.clear();
+        mediaCandidates.clear();
+        nominated.clear();
+        socketCache.clear();
+        triggeredCheckQueue.clear();
+        socketCache = null;
     }
 
     @Override
@@ -2196,18 +2208,18 @@ abstract class IceStateMachine extends SimpleChannelHandler implements Runnable,
         return stunServer;
 
     }
-    Map<IceSocket, List<IceSocketChannel>> channels = new HashMap<IceSocket,List<IceSocketChannel>>();
+    Map<IceSocket, List<IceSocketChannel>> channels = new HashMap<IceSocket, List<IceSocketChannel>>();
 
     @Override
     public List<IceSocketChannel> getChannels(final IceSocket socket) {
         if (!channels.containsKey(socket) && nominated.containsKey(socket)) {
             LinkedList<IceSocketChannel> channelList = new LinkedList<IceSocketChannel>();
             for (short component = (short) 0; component < nominated.get(socket).size(); component++) {
-                channelList.add(new AbstractIceSocketChannel(this,socket,component));
+                channelList.add(new AbstractIceSocketChannel(this, socket, component));
             }
             List<LocalCandidate> localCandidates = getLocalCandidates(socket);
             for (LocalCandidate candidate : localCandidates) {
-                candidate.socket.registerStunEventListener((AbstractIceSocketChannel)channelList.get(candidate.getComponentId()));
+                candidate.socket.registerStunEventListener((AbstractIceSocketChannel) channelList.get(candidate.getComponentId()));
             }
             channels.put(socket, channelList);
         }

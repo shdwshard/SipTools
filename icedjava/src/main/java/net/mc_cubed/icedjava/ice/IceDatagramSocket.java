@@ -25,6 +25,7 @@ import javax.sdp.Media;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
@@ -38,7 +39,8 @@ import javax.sdp.MediaDescription;
 import javax.sdp.SdpFactory;
 import javax.sdp.SdpParseException;
 import net.mc_cubed.icedjava.stun.StunUtil;
-import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
+import net.mc_cubed.icedjava.util.ExpiringCache;
+import org.glassfish.grizzly.filterchain.BaseFilter;
 
 /**
  * The name is somewhat misleading since this class doesn't actually implement
@@ -52,7 +54,7 @@ import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
  * @see IceStreamSocket
  * @see IceSocket
  */
-public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements IceSocket {
+public class IceDatagramSocket extends BaseFilter implements IceSocket {
 
     private final InetSocketAddress stunServer;
     private Map<String, IcePeer> _peers = new HashMap<String, IcePeer>();
@@ -61,6 +63,7 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
     private Short components;
     protected Media media;
     public static final String PROP_MEDIA = "media";
+    ExpiringCache<SocketAddress, IcePeer> socketCache = new ExpiringCache<SocketAddress, IcePeer>();
 
     /**
      * Get the value of media
@@ -354,7 +357,7 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
 
     @Override
     public int write(ByteBuffer data, short componentId) throws IOException {
-        for (IcePeer peer : this.getPeerMap().values()) {
+        for (IcePeer peer : getPeerMap().values()) {
             sendTo(peer, componentId, data);
         }
         return 0;
@@ -368,5 +371,27 @@ public class IceDatagramSocket extends SimpleChannelUpstreamHandler implements I
     @Override
     public int send(ByteBuffer data, short componentId) throws IOException {
         return write(data,componentId);
+    }
+    
+    protected IcePeer translateSocketAddressToPeer(SocketAddress address, short componentId) {
+        if (socketCache.containsKey(address)) {
+            return socketCache.get(address);
+        } else {
+            IcePeer peer = null;
+            for (IcePeer checkPeer : getPeerMap().values()) {
+                if (checkPeer.getNominated().get(this) != null
+                        && checkPeer.getNominated().get(this).size() > componentId) {
+                    CandidatePair pair = checkPeer.getNominated().get(this).get(componentId);
+                    if (pair.getRemoteCandidate().getSocketAddress().equals(address)) {
+                        peer = checkPeer;
+                        break;
+                    }
+                }
+            }
+            if (peer != null) {
+                socketCache.admit(address, peer);
+            }
+            return peer;
+        }
     }
 }

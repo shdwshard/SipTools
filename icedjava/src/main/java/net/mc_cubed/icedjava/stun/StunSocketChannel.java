@@ -19,6 +19,7 @@
  */
 package net.mc_cubed.icedjava.stun;
 
+import java.io.IOException;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
@@ -36,5 +37,5 @@ public interface StunSocketChannel extends ByteChannel, ScatteringByteChannel, G
 
     SocketAddress receive(ByteBuffer dst);
 
-    int send(ByteBuffer src, SocketAddress target);
+    int send(ByteBuffer src, SocketAddress target) throws IOException;
 }

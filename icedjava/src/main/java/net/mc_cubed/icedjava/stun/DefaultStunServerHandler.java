@@ -19,6 +19,7 @@
  */
 package net.mc_cubed.icedjava.stun;
 
+import java.io.IOException;
 import net.mc_cubed.icedjava.packet.attribute.Attribute;
 import net.mc_cubed.icedjava.packet.attribute.AttributeType;
 import net.mc_cubed.icedjava.packet.attribute.ErrorCodeAttribute;
@@ -28,48 +29,47 @@ import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.channels.Channels;
 import java.util.LinkedList;
 import java.util.List;
 import net.mc_cubed.icedjava.packet.StunPacket;
 import net.mc_cubed.icedjava.packet.attribute.AttributeFactory;
-import org.jboss.netty.channel.ChannelFuture;
-import org.jboss.netty.channel.ChannelHandlerContext;
-import org.jboss.netty.channel.ChannelPipelineCoverage;
-import org.jboss.netty.channel.Channels;
-import org.jboss.netty.channel.MessageEvent;
-import org.jboss.netty.channel.SimpleChannelHandler;
+import org.glassfish.grizzly.filterchain.BaseFilter;
+import org.glassfish.grizzly.filterchain.FilterChainContext;
+import org.glassfish.grizzly.filterchain.NextAction;
 
 /**
  *
  * @author Charles Chappell
  */
-@ChannelPipelineCoverage(ChannelPipelineCoverage.ONE)
-public class DefaultStunServerHandler extends SimpleChannelHandler {
+public class DefaultStunServerHandler extends BaseFilter {
 
     static SoftwareAttribute mySoftwareAttribute = AttributeFactory.createSoftwareAttribute(
             "IcedJava 1.0 - Copyright MC Cubed, Inc. of Saitama, Japan, released under LGPL v3.0");
 
+    protected final boolean errorOnUnknown;
+
     public DefaultStunServerHandler() {
+        this(false);
+    }
+    public DefaultStunServerHandler(boolean errorOnUnknown) {
+        this.errorOnUnknown = errorOnUnknown;
     }
 
     @Override
-    public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
-        if (e.getMessage() instanceof StunPacket) {
-            if (processPacket((StunPacket)e.getMessage(), e.getRemoteAddress(),ctx)) {
-                return;
-            } else {
-                super.messageReceived(ctx,e);                
-            }
+    public NextAction handleRead(FilterChainContext ctx) throws IOException {
+        if (ctx.getMessage() instanceof StunPacket) {
+            // If this is a stun message, we'll handle it here
+            return processPacket((StunPacket) ctx.getMessage(), (SocketAddress) ctx.getAddress(), ctx);
         } else {
-            super.messageReceived(ctx, e);
+            // Continue to the next filter
+            return ctx.getInvokeAction();
         }
     }
 
-
-
     // The actual workhorse method
     // Follows RFC 5389 Section 7.3.1
-    protected boolean processPacket(StunPacket packet, SocketAddress senderAddress,ChannelHandlerContext ctx) {
+    protected NextAction processPacket(StunPacket packet, SocketAddress senderAddress, FilterChainContext ctx) throws IOException {
         // Unknown Attribute Check
         List<AttributeType> unknownAttributes = new LinkedList<AttributeType>();
         for (Attribute attr : packet.getAttributes()) {
@@ -91,22 +91,22 @@ public class DefaultStunServerHandler extends SimpleChannelHandler {
         if ((packet.getMessageClass() != MessageClass.REQUEST
                 && packet.getMessageClass() != MessageClass.INDICATION)) {
             // Not acting as a client
-            return false;
+            return ctx.getInvokeAction();
         }
 
-        // We only support the binding method currently
-        if (packet.getMethod() != MessageMethod.BINDING) {
-            // Not acting as a client
-            StunPacketImpl reply = new StunPacketImpl(MessageClass.ERROR, MessageMethod.BINDING, packet.getTransactionId());
-            reply.getAttributes().add(new ErrorCodeAttribute(400, "Unknown method invoked"));
-            reply.getAttributes().add(mySoftwareAttribute);
-            reply.getAttributes().add(AttributeFactory.createFingerprintAttribute());
+        if (errorOnUnknown) {
+            // We only support the binding method currently
+            if (packet.getMethod() != MessageMethod.BINDING) {
+                // Not acting as a client
+                StunPacketImpl reply = new StunPacketImpl(MessageClass.ERROR, MessageMethod.BINDING, packet.getTransactionId());
+                reply.getAttributes().add(new ErrorCodeAttribute(400, "Unknown method invoked"));
+                reply.getAttributes().add(mySoftwareAttribute);
+                reply.getAttributes().add(AttributeFactory.createFingerprintAttribute());
 
-            ChannelFuture cf = Channels.future(ctx.getChannel());
-            Channels.write(ctx, cf, reply, senderAddress);
-            return false;
+                ctx.write(senderAddress, reply, null);
+                return ctx.getStopAction();
+            }
         }
-
         // Process the message
         StunPacket reply = null;
         switch (packet.getMessageClass()) {
@@ -116,6 +116,9 @@ public class DefaultStunServerHandler extends SimpleChannelHandler {
             case INDICATION:
                 reply = processIndication(packet, senderAddress);
                 break;
+            default:
+                // We don't handle this type of message, to proceed to the next filter.
+                return ctx.getInvokeAction();
         }
 
         if (reply != null) {
@@ -124,11 +127,11 @@ public class DefaultStunServerHandler extends SimpleChannelHandler {
             }
             reply.getAttributes().add(mySoftwareAttribute);
             reply.getAttributes().add(AttributeFactory.createFingerprintAttribute());
-            
-            ChannelFuture cf = Channels.future(ctx.getChannel());
-            Channels.write(ctx, cf, reply, senderAddress);
+
+            ctx.write(senderAddress, reply, null);
         }
-        return true;
+
+        return ctx.getStopAction();
     }
 
     private StunPacketImpl processIndication(StunPacket packet, SocketAddress remoteSocket) {
@@ -140,7 +143,7 @@ public class DefaultStunServerHandler extends SimpleChannelHandler {
         // Don't process any attributes, just reply with the mapped address attribute
         StunPacketImpl reply = new StunPacketImpl(MessageClass.SUCCESS, MessageMethod.BINDING, packet.getTransactionId());
         if (packet.isRfc5389()) {
-            reply.getAttributes().add(AttributeFactory.createXORMappedAddressAttribute(insocket.getAddress(), insocket.getPort(),packet.getTransactionId()));
+            reply.getAttributes().add(AttributeFactory.createXORMappedAddressAttribute(insocket.getAddress(), insocket.getPort(), packet.getTransactionId()));
         } else {
             reply.getAttributes().add(AttributeFactory.createMappedAddressAttribute(insocket.getAddress(), insocket.getPort()));
         }

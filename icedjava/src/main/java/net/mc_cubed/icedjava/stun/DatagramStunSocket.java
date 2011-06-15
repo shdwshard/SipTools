@@ -28,9 +28,8 @@ import net.mc_cubed.icedjava.packet.header.MessageMethod;
 import net.mc_cubed.icedjava.stun.event.StunEventListener;
 import net.mc_cubed.icedjava.util.ExpiringCache;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.math.BigInteger;
-import java.net.Inet4Address;
-import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -39,28 +38,32 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.mc_cubed.icedjava.packet.StunPacket;
 import net.mc_cubed.icedjava.packet.attribute.AttributeFactory;
-import org.jboss.netty.channel.ChannelDownstreamHandler;
-import org.jboss.netty.channel.ChannelFuture;
-import org.jboss.netty.channel.ChannelHandlerContext;
-import org.jboss.netty.channel.ChannelPipelineCoverage;
-import org.jboss.netty.channel.ChannelStateEvent;
-import org.jboss.netty.channel.ChannelUpstreamHandler;
-import org.jboss.netty.channel.Channels;
-import org.jboss.netty.channel.ExceptionEvent;
-import org.jboss.netty.channel.MessageEvent;
-import org.jboss.netty.channel.SimpleChannelHandler;
+import org.glassfish.grizzly.Connection;
+import org.glassfish.grizzly.filterchain.BaseFilter;
+import org.glassfish.grizzly.filterchain.FilterChain;
+import org.glassfish.grizzly.filterchain.FilterChainContext;
+import org.glassfish.grizzly.filterchain.NextAction;
 
 /**
  *
  * @author Charles Chappell
  */
-@ChannelPipelineCoverage(ChannelPipelineCoverage.ONE)
-public class DatagramStunSocket extends SimpleChannelHandler implements StunSocket, StunPacketSender, ChannelUpstreamHandler, ChannelDownstreamHandler {
+public class DatagramStunSocket extends BaseFilter implements StunSocket, StunPacketSender {
 
-    protected Logger log = Logger.getLogger(getClass().getName());
+    protected static Logger log = Logger.getLogger(DatagramStunSocket.class.getName());
     static ExpiringCache<BigInteger, StunReplyFuture> requestCache = new ExpiringCache<BigInteger, StunReplyFuture>();
-    ChannelHandlerContext localContext;
-    
+    protected volatile WeakReference<FilterChain> filterChain;
+    protected volatile WeakReference<Connection<SocketAddress>> connection;
+
+    @Override
+    public void onAdded(FilterChain filterChain) {
+        this.filterChain = new WeakReference<FilterChain>(filterChain);
+        super.onAdded(filterChain);
+    }
+
+    void setServerConnection(Connection<SocketAddress> connection) {
+        this.connection = new WeakReference<Connection<SocketAddress>>(connection);
+    }
     //protected StunListener stunListener;
     /**
      * RFC 5389 7.1:
@@ -68,40 +71,12 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunSock
      * If the path MTU is unknown, messages SHOULD be the smaller of 576 and the
      * first-hop MTU for IPv4 and 1280 bytes for IPv6.
      */
-    private int ip4MaxLength = 548;  // IP4 header = 28 bytes
-    private int ip6MaxLength = 1232; // IP6 header = 48 bytes fixed
+    public static final int IP4_MAX_LENGTH = 548;  // IP4 header = 28 bytes
+    public static final int IP6_MAX_LENGTH = 1232; // IP6 header = 48 bytes fixed
     private int maxRetries = 7; // RFC 5389 7.2.1:  Rc
     private int initialTimeout = 500; // RFC 5389 7.2.1: RTO
 
     protected DatagramStunSocket() {
-    }
-
-    @Override
-    public ChannelFuture send(InetAddress addr, int port, StunPacket packet) throws IOException {
-        return send(new InetSocketAddress(addr, port), packet);
-    }
-
-    @Override
-    public ChannelFuture send(SocketAddress remoteSocket, StunPacket packet) throws IOException {
-        /**
-         * RFC 5389 7.1:
-         * All STUN messages sent over UDP SHOULD be less than the path MTU, if
-         * known. If the path MTU is unknown, messages SHOULD be the smaller of
-         * 576 bytes and the first-hop MTU for IPv4 and 1280 bytes for IPv6
-         */
-        if (((InetSocketAddress) remoteSocket).getAddress() instanceof Inet4Address) {
-            if (packet.getBytes().length > ip4MaxLength) {
-                throw new OversizeStunPacketException(remoteSocket, packet);
-            }
-        } else if (((InetSocketAddress) remoteSocket).getAddress() instanceof Inet6Address) {
-            if (packet.getBytes().length > ip6MaxLength) {
-                throw new OversizeStunPacketException(remoteSocket, packet);
-            }
-
-        }
-        ChannelFuture future = Channels.future(localContext.getChannel());
-        Channels.write(localContext, future, packet, remoteSocket);
-        return future;
     }
 
     @Override
@@ -148,7 +123,7 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunSock
                      * have failed.
                      */
                     for (int i = 0; i < maxRetries; i++) {
-                        send(server, port, request);
+                        filterChain.get().write(connection.get(), new InetSocketAddress(server, port), request, null);
 
                         /**
                          * RFC 5389 7.2.1:
@@ -194,7 +169,7 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunSock
 
         if (requestFuture != null) {
             requestFuture.setReply(new StunReplyImpl(packet));
-            log.log(Level.FINEST, "Setting reply to Stun future: {0}:{1}", new Object[] {packet.getId(),packet});
+            log.log(Level.FINEST, "Setting reply to Stun future: {0}:{1}", new Object[]{packet.getId(), packet});
         } else {
             log.log(Level.INFO, "Got an unexpected reply: {0}", packet);
         }
@@ -202,56 +177,55 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunSock
 
     @Override
     public InetAddress getLocalAddress() {
-        return ((InetSocketAddress) localContext.getChannel().getLocalAddress()).getAddress();
+        return ((InetSocketAddress) connection.get().getLocalAddress()).getAddress();
     }
 
     @Override
     public String toString() {
-        return getClass().getName() + "[socketAddress=" + localContext.getChannel().getLocalAddress() + "]";
+        return getClass().getName() + "[socketAddress=" + connection.get().getLocalAddress() + "]";
     }
 
     @Override
-    public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
-        //DatagramPacket p = new DatagramPacket(new byte[MAX_PACKET_LENGTH], MAX_PACKET_LENGTH);
-
-        //super.receive(p);
-        if (e.getMessage() instanceof StunPacket) {
-            storeAndNotify((StunPacket)e.getMessage());
+    public NextAction handleRead(FilterChainContext ctx) throws IOException {
+        if (ctx.getMessage() instanceof StunPacket) {
+            storeAndNotify((StunPacket) ctx.getMessage());
         } else {
-            log.log(Level.INFO, "Received a non-STUN packet on a STUN only socket.  Dropping packet from: {0}", e.getRemoteAddress());
+            log.log(Level.INFO, "Received a non-STUN packet on a STUN only socket.  Dropping {0} packet from: {1}", new Object[] {ctx.getMessage().getClass().getName(),ctx.getAddress()});
         }
+
+        return ctx.getStopAction();
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception {
+    public void exceptionOccurred(FilterChainContext ctx, Throwable error) {
+        Object address = ctx.getAddress();
         for (StunReplyFuture replyFuture : requestCache.values()) {
-            if (!replyFuture.isDone() && !replyFuture.isCancelled()) {
-                replyFuture.setReply(new StunReplyImpl(e.getCause()));
+            if (!replyFuture.isDone() && !replyFuture.isCancelled() && replyFuture.getSockAddr().equals(address)) {
+                replyFuture.setReply(new StunReplyImpl(error.getCause()));
             }
         }
-        ctx.sendUpstream(e);
+        super.exceptionOccurred(ctx, error);
     }
 
     @Override
-    public void channelBound(ChannelHandlerContext ctx, ChannelStateEvent e) throws Exception {
-        localContext = ctx;
-        log.log(Level.FINEST, "Got new channel context: {0}", ctx);
-        ctx.sendUpstream(e);
-    }
-
-    @Override
-    public void close() {
-        localContext.getChannel().close().awaitUninterruptibly();
+    public void close() throws IOException {
+        try {
+            connection.get().close().get();
+        } catch (InterruptedException ex) {
+            Logger.getLogger(DatagramStunSocket.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (ExecutionException ex) {
+            Logger.getLogger(DatagramStunSocket.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     @Override
     public int getLocalPort() {
-        return ((InetSocketAddress) localContext.getChannel().getLocalAddress()).getPort();
+        return ((InetSocketAddress) connection.get().getLocalAddress()).getPort();
     }
 
     @Override
     public InetSocketAddress getLocalSocketAddress() {
-        return (InetSocketAddress) localContext.getChannel().getLocalAddress();
+        return (InetSocketAddress) connection.get().getLocalAddress();
     }
 
     @Override
@@ -260,7 +234,7 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunSock
     }
 
     @Override
-    public int send(ByteBuffer src, SocketAddress target) {
+    public int send(ByteBuffer src, SocketAddress target) throws IOException {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
@@ -383,6 +357,7 @@ public class DatagramStunSocket extends SimpleChannelHandler implements StunSock
         return maxRetries;
     }
 
+    @Override
     public void setMaxRetries(int maxRetries) {
         this.maxRetries = maxRetries;
     }

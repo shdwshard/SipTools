@@ -19,14 +19,14 @@
  */
 package net.mc_cubed.icedjava.stun;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.mc_cubed.icedjava.packet.StunPacket;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.channel.Channel;
-import org.jboss.netty.channel.ChannelHandlerContext;
-import org.jboss.netty.channel.ChannelPipelineCoverage;
-import org.jboss.netty.handler.codec.frame.FrameDecoder;
+import org.glassfish.grizzly.filterchain.BaseFilter;
+import org.glassfish.grizzly.filterchain.FilterChainContext;
+import org.glassfish.grizzly.filterchain.NextAction;
 
 /**
  * Decodes a ChannelBuffer into a StunPacket object if it contains one
@@ -34,39 +34,52 @@ import org.jboss.netty.handler.codec.frame.FrameDecoder;
  * @author Charles Chappell
  * @since 1.0
  */
-@ChannelPipelineCoverage(ChannelPipelineCoverage.ALL)
-class StunPacketDecoder extends FrameDecoder {
+class StunPacketProtocolFilter extends BaseFilter {
 
     final StunFactory factory = StunFactory.getInstance();
     final StunAuthenticator authenticator;
     Logger log = Logger.getLogger(getClass().getName());
 
     @Override
-    protected Object decode(ChannelHandlerContext ctx, Channel channel, ChannelBuffer buffer) throws Exception {
+    public NextAction handleRead(FilterChainContext ctx) throws IOException {
+        ByteBuffer buffer = ctx.getMessage();
         StunPacket packet = null;
         try {
             if (authenticator != null) {
-                packet = factory.processChannelBuffer(buffer, authenticator);
+                packet = factory.processByteBuffer(buffer, authenticator);
             } else {
-                packet = factory.processChannelBuffer(buffer);
+                packet = factory.processByteBuffer(buffer);
             }
         } catch (Exception ex) {
             // If the factory throws an exception, this probably wasn't a stun packet
+            //log.log(Level.INFO,"Caught an exception processing packet buffer",ex);
         }
 
         if (packet != null) {
             log.log(Level.FINEST, "Decoded stun packet {0}", packet);
-            return packet;
-        } else {
-            return buffer;
+            ctx.setMessage(packet);            
         }
+        return ctx.getInvokeAction();
     }
 
-    public StunPacketDecoder() {
+    @Override
+    public NextAction handleWrite(FilterChainContext ctx) throws IOException {
+        Object msg = ctx.getMessage();
+        if (msg instanceof StunPacket) {
+            log.log(Level.FINEST,"Encoding stun packet {0}",msg);
+            StunPacket stunPacket = (StunPacket)msg;
+            byte[] packetBytes = stunPacket.getBytes();
+            ctx.setMessage(ByteBuffer.wrap(packetBytes));
+        }
+        return ctx.getInvokeAction();
+    }
+
+    
+    public StunPacketProtocolFilter() {
         this(null);
     }
 
-    public StunPacketDecoder(StunAuthenticator authenticator) {
+    public StunPacketProtocolFilter(StunAuthenticator authenticator) {
         this.authenticator = authenticator;
     }
 }

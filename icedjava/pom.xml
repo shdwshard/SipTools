@@ -4,12 +4,12 @@
     <parent>
         <groupId>net.mc_cubed.sip</groupId>
         <artifactId>SipTools</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <version>1.0.alpha1</version>
     </parent>
     <groupId>net.mc_cubed</groupId>
     <artifactId>icedjava</artifactId>
     <name>IcedJava</name>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0-alpha1</version>
     <licenses>
         <license name="LGPL" />
     </licenses>
@@ -108,10 +108,10 @@
             <version>2.1.1e</version>
         </dependency>
         <dependency>
-            <groupId>org.jboss.netty</groupId>
-            <artifactId>netty</artifactId>
-            <version>3.1.5.GA</version>
-        </dependency>
+            <groupId>org.glassfish.grizzly</groupId>
+            <artifactId>grizzly-framework</artifactId>
+            <version>2.1.1</version>
+        </dependency>        
         <dependency>
             <groupId>org.swinglabs</groupId>
             <artifactId>swing-layout</artifactId>

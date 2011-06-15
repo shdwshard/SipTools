@@ -29,6 +29,7 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.util.HashSet;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.Queue;
 import java.util.logging.Level;
@@ -40,12 +41,8 @@ import net.mc_cubed.icedjava.stun.event.BytesAvailableEvent;
 import net.mc_cubed.icedjava.stun.event.StunEvent;
 import net.mc_cubed.icedjava.stun.event.StunEventListener;
 import net.mc_cubed.icedjava.util.AddressedByteBuffer;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
-import org.jboss.netty.channel.ChannelFuture;
-import org.jboss.netty.channel.ChannelHandlerContext;
-import org.jboss.netty.channel.Channels;
-import org.jboss.netty.channel.MessageEvent;
+import org.glassfish.grizzly.filterchain.FilterChainContext;
+import org.glassfish.grizzly.filterchain.NextAction;
 
 /**
  * A datagram socket that can be used for STUN testing, or sending and receiving
@@ -61,10 +58,9 @@ public class DatagramDemultiplexerSocket extends DatagramStunSocket implements D
     private DatagramStunSocketBridge socket = null;
     final protected Queue<AddressedByteBuffer> bufferQueue = new LinkedBlockingQueue<AddressedByteBuffer>();
     final protected HashSet<StunEventListener> listeners = new HashSet<StunEventListener>();
-    
     @Inject
     Event<StunEvent> eventBroadcaster;
-    
+
     protected DatagramDemultiplexerSocket(StunEventListener stunEventListener) {
         if (stunEventListener != null) {
             listeners.add(stunEventListener);
@@ -72,15 +68,18 @@ public class DatagramDemultiplexerSocket extends DatagramStunSocket implements D
     }
 
     @Override
-    public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
+    public NextAction handleRead(FilterChainContext e) throws IOException {
         if (e.getMessage() instanceof StunPacket) {
-            super.messageReceived(ctx, e);
-        } else if (e.getMessage() instanceof ChannelBuffer) {
-            ChannelBuffer cb = (ChannelBuffer) e.getMessage();
-            bufferQueue.add(new AddressedByteBuffer(e.getRemoteAddress(), cb.toByteBuffer()));
+            return super.handleRead(e);
+        } else if (e.getMessage() instanceof ByteBuffer) {
+            log.log(Level.FINER, "Got a data packet of length {0} from peer {1}", new Object[]{((ByteBuffer)e.getMessage()).remaining(), e.getAddress()});
+            ByteBuffer cb = (ByteBuffer) e.getMessage();
+            bufferQueue.add(new AddressedByteBuffer((SocketAddress) e.getAddress(), cb));
             broadcastReceivedMessage();
+            return e.getStopAction();
         } else {
-            log.log(Level.WARNING, "Got a packet of unknown type {0} from peer {1}", new Object[]{e.getMessage().getClass().getName(), e.getRemoteAddress()});
+            log.log(Level.WARNING, "Got a packet of unknown type {0} from peer {1}", new Object[]{e.getMessage().getClass().getName(), e.getAddress()});
+            return e.getInvokeAction();
         }
     }
 
@@ -99,35 +98,23 @@ public class DatagramDemultiplexerSocket extends DatagramStunSocket implements D
     @Override
     public int read(ByteBuffer bb) throws IOException {
         AddressedByteBuffer packet = bufferQueue.poll();
-        
+
         bb.put(packet.getBuffer());
+        bb.flip();
         return bb.remaining();
     }
 
     @Override
     public boolean isOpen() {
-        return localContext.getChannel().isOpen();
+        return connection.get() != null ? connection.get().isOpen() : false;
     }
 
     @Override
     public int write(ByteBuffer bb) throws IOException {
-        ChannelBuffer cb = ChannelBuffers.copiedBuffer(bb);
-        ChannelFuture future = Channels.future(localContext.getChannel());
-        Channels.write(localContext, future, cb);
-        if (!nonBlocking) {
-            try {
-                future.await();
-            } catch (InterruptedException ex) {
-                Logger.getLogger(DatagramDemultiplexerSocket.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            if (future.isSuccess()) {
-                return bb.remaining();
-            } else {
-                return -1;
-            }
-        } else {
-            return 0;
-        }
+        int bytes = bb.remaining();
+        connection.get().write(bb);
+        return bytes;
+
     }
 
     @Override
@@ -141,7 +128,7 @@ public class DatagramDemultiplexerSocket extends DatagramStunSocket implements D
 
     @Override
     public long read(ByteBuffer[] bbs) throws IOException {
-        return read(bbs,0,bbs.length);
+        return read(bbs, 0, bbs.length);
     }
 
     @Override
@@ -151,44 +138,28 @@ public class DatagramDemultiplexerSocket extends DatagramStunSocket implements D
             bytesWritten += write(bbs[i]);
         }
         return bytesWritten;
-        
+
     }
 
     @Override
     public long write(ByteBuffer[] bbs) throws IOException {
-        return write(bbs,0,bbs.length);        
+        return write(bbs, 0, bbs.length);
     }
 
     @Override
     public SocketAddress receive(ByteBuffer dst) {
         AddressedByteBuffer packet = bufferQueue.poll();
-        
+
         dst.put(packet.getBuffer());
+        dst.flip();
         return packet.getAddress();
     }
 
     @Override
-    public int send(ByteBuffer src, SocketAddress target) {
+    public int send(ByteBuffer src, SocketAddress target) throws IOException {
         int remainingBytes = src.remaining();
-        ChannelFuture cf = Channels.future(localContext.getChannel());
-        ChannelBuffer buffer = ChannelBuffers.copiedBuffer(src);
-        Channels.write(localContext, cf, buffer, target);
-        if (!nonBlocking) {
-            try {
-                cf.await();
-                if (cf.isSuccess()) {
-                    return remainingBytes;
-                } else {
-                    return 0;
-                }
-            } catch (InterruptedException ex) {
-                Logger.getLogger(DatagramDemultiplexerSocket.class.getName()).log(Level.SEVERE, null, ex);
-                return 0;
-            }
-        } else {
-            return remainingBytes;
-        }
-        
+        connection.get().write(target, src, null);
+        return remainingBytes;
     }
 
     @Override
@@ -208,11 +179,11 @@ public class DatagramDemultiplexerSocket extends DatagramStunSocket implements D
         if (eventBroadcaster != null) {
             eventBroadcaster.fire(event);
         }
-        
+
         // Fire listeners next
         for (StunEventListener listener : listeners) {
             listener.stunEvent(event);
-        }       
+        }
     }
 
     /**
@@ -229,33 +200,38 @@ public class DatagramDemultiplexerSocket extends DatagramStunSocket implements D
             this.outer = outer;
 
         }
-        
-        
+
         @Override
         public synchronized void bind(SocketAddress sa) throws SocketException {
-            if (localContext.getChannel() != null) {
-                localContext.getChannel().bind(sa);
-            }
+            throw new UnsupportedOperationException("Not Implemented");
         }
 
         @Override
         public void close() {
-            localContext.getChannel().close().awaitUninterruptibly();
+            throw new UnsupportedOperationException("Not Implemented");
         }
 
         @Override
         public void connect(InetAddress address, int port) {
-            localContext.getChannel().connect(new InetSocketAddress(address, port));
+            throw new UnsupportedOperationException("Not Implemented");
         }
 
         @Override
         public void connect(SocketAddress sa) throws SocketException {
-            localContext.getChannel().connect(sa);
+            throw new UnsupportedOperationException("Not Implemented");
         }
 
         @Override
         public void disconnect() {
-            localContext.getChannel().disconnect().awaitUninterruptibly();
+            try {
+                connection.get().close().get();
+            } catch (InterruptedException ex) {
+                Logger.getLogger(DatagramDemultiplexerSocket.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (ExecutionException ex) {
+                Logger.getLogger(DatagramDemultiplexerSocket.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (IOException ex) {
+                Logger.getLogger(DatagramDemultiplexerSocket.class.getName()).log(Level.SEVERE, null, ex);
+            }
         }
 
         @Override
@@ -270,27 +246,27 @@ public class DatagramDemultiplexerSocket extends DatagramStunSocket implements D
 
         @Override
         public InetAddress getInetAddress() {
-            return ((InetSocketAddress) localContext.getChannel().getRemoteAddress()).getAddress();
+            return ((InetSocketAddress) connection.get().getPeerAddress()).getAddress();
         }
 
         @Override
         public InetAddress getLocalAddress() {
-            return ((InetSocketAddress) localContext.getChannel().getLocalAddress()).getAddress();
+            return ((InetSocketAddress) connection.get().getLocalAddress()).getAddress();
         }
 
         @Override
         public int getLocalPort() {
-            return ((InetSocketAddress) localContext.getChannel().getLocalAddress()).getPort();
+            return ((InetSocketAddress) connection.get().getLocalAddress()).getPort();
         }
 
         @Override
         public SocketAddress getLocalSocketAddress() {
-            return localContext.getChannel().getLocalAddress();
+            return (SocketAddress) connection.get().getLocalAddress();
         }
 
         @Override
         public int getPort() {
-            return ((InetSocketAddress) localContext.getChannel().getRemoteAddress()).getPort();
+            return ((InetSocketAddress) connection.get().getPeerAddress()).getPort();
         }
 
         @Override
@@ -300,7 +276,7 @@ public class DatagramDemultiplexerSocket extends DatagramStunSocket implements D
 
         @Override
         public SocketAddress getRemoteSocketAddress() {
-            return localContext.getChannel().getRemoteAddress();
+            return (SocketAddress) connection.get().getPeerAddress();
         }
 
         @Override
@@ -325,21 +301,17 @@ public class DatagramDemultiplexerSocket extends DatagramStunSocket implements D
 
         @Override
         public boolean isBound() {
-            return localContext.getChannel().isBound();
+            throw new UnsupportedOperationException("Not Implemented");
         }
 
         @Override
         public boolean isClosed() {
-            if (localContext.getChannel() == null) {
-                return true;
-            } else {
-                return !localContext.getChannel().isOpen();
-            }
+            throw new UnsupportedOperationException("Not Implemented");
         }
 
         @Override
         public boolean isConnected() {
-            return localContext.getChannel().isConnected();
+            throw new UnsupportedOperationException("Not Implemented");
         }
 
         @Override
@@ -359,7 +331,7 @@ public class DatagramDemultiplexerSocket extends DatagramStunSocket implements D
         public void send(DatagramPacket dp) throws IOException {
             ByteBuffer bb = ByteBuffer.allocate(dp.getLength());
             bb.put(dp.getData(), dp.getOffset(), dp.getLength());
-            outer.send(bb,dp.getSocketAddress());
+            outer.send(bb, dp.getSocketAddress());
         }
 
         @Override
@@ -394,8 +366,8 @@ public class DatagramDemultiplexerSocket extends DatagramStunSocket implements D
     }
 
     private static class BytesAvailableEventImpl implements BytesAvailableEvent {
-        private static final long serialVersionUID = 5561852445673815517L;
 
+        private static final long serialVersionUID = 5561852445673815517L;
         private final StunSocketChannel thisChannel;
 
         public BytesAvailableEventImpl(StunSocketChannel thisChannel) {

@@ -125,11 +125,12 @@ public class IceUtil {
                             // Create a stun socket to measure this IP.
                             socket = StunUtil.getStunSocket(new InetSocketAddress(addr, 0), StunListenerType.CLIENT);
 
+                            socket.setMaxRetries(2);
                             long startTime = new Date().getTime();
                             StunReply reply = socket.doTest(stunServer).get();
                             long testInterval = new Date().getTime() - startTime;
 
-                            if (reply.isSuccess()) {
+                            if (reply != null && reply.isSuccess()) {
                                 ifaceList.add(new InterfaceProfile(
                                         iface,
                                         addr,

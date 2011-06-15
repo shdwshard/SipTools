@@ -19,6 +19,7 @@
  */
 package net.mc_cubed.icedjava.util;
 
+import java.lang.ref.SoftReference;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.HashMap;
@@ -82,7 +83,10 @@ public class ExpiringCache<K extends Object, T extends Object> implements Map<K,
         HashMap<K, T> hm = new HashMap<K, T>();
 
         for (Entry<K, CachedObject<T>> e : cacheMap.entrySet()) {
-            hm.put(e.getKey(), e.getValue().cachedData);
+            T value = e.getValue().cachedData.get();
+            if (value != null) {
+                hm.put(e.getKey(), value);
+            }
         }
 
         return hm;
@@ -108,7 +112,7 @@ public class ExpiringCache<K extends Object, T extends Object> implements Map<K,
         if (cacheManager != null) {
             cacheManager.cancel();
         }
-        cacheManager = new Timer(true);
+        cacheManager = new Timer(true);        
         cacheManager.schedule(
                 new TimerTask() {
 
@@ -329,7 +333,10 @@ public class ExpiringCache<K extends Object, T extends Object> implements Map<K,
     public Collection<T> values() {
         Collection<T> retval = new LinkedList<T>();
         for (CachedObject<T> obj : cacheMap.values()) {
-            retval.add(obj.cachedData);
+            T value = obj.cachedData.get();
+            if (value != null) {
+                retval.add(value);
+            }
         }
         return retval;
     }
@@ -346,7 +353,7 @@ public class ExpiringCache<K extends Object, T extends Object> implements Map<K,
      */
     protected class CachedObject<T extends Object> {
 
-        T cachedData;
+        SoftReference<T> cachedData;
         long timeCached;
         long timeAccessedLast;
         int numberOfAccesses;
@@ -356,7 +363,7 @@ public class ExpiringCache<K extends Object, T extends Object> implements Map<K,
 
         CachedObject(T cachedData) {
             long now = System.currentTimeMillis();
-            this.cachedData = cachedData;
+            this.cachedData = new SoftReference<T>(cachedData);
             timeCached = now;
             timeAccessedLast = now;
             ++numberOfAccesses;
@@ -364,7 +371,7 @@ public class ExpiringCache<K extends Object, T extends Object> implements Map<K,
 
         CachedObject(T cachedData, long timeToLive, long idleTimeout) {
             long now = System.currentTimeMillis();
-            this.cachedData = cachedData;
+            this.cachedData = new SoftReference<T>(cachedData);
             objectTTL = timeToLive;
             objectIdleTimeout = idleTimeout;
             userTimeouts = true;
@@ -375,14 +382,14 @@ public class ExpiringCache<K extends Object, T extends Object> implements Map<K,
 
         T getCachedData(Object key) {
             long now = System.currentTimeMillis();
-            if (hasExpired(now)) {
+            if (hasExpired(now) || cachedData.get() == null) {
                 cachedData = null;
                 cacheMap.remove((K) key);
                 return null;
             }
             timeAccessedLast = now;
             ++numberOfAccesses;
-            return cachedData;
+            return cachedData.get();
         }
 
         boolean hasExpired(long now) {

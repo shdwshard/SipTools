@@ -17,7 +17,6 @@
  * License along with IcedJava.  If not, see
  * <http://www.gnu.org/licenses/>.
  */
-
 package net.mc_cubed.icedjava.util;
 
 import java.io.IOException;
@@ -42,17 +41,25 @@ import net.mc_cubed.icedjava.stun.StunUtil;
  * @since 1.0
  */
 public class SipNetworkLayer implements gov.nist.core.net.NetworkLayer {
-    
+
     StunUtil stunUtil = new StunUtil();
 
     @Override
     public DatagramSocket createDatagramSocket() throws SocketException {
-        return StunUtil.getDemultiplexerSocket(null,null).getDatagramSocket();
+        try {
+            return StunUtil.getDemultiplexerSocket(null, null).getDatagramSocket();
+        } catch (IOException ex) {
+            throw (SocketException) new SocketException().initCause(ex);
+        }
     }
 
     @Override
     public DatagramSocket createDatagramSocket(int port, InetAddress bindAddress) throws SocketException {
-        return StunUtil.getDemultiplexerSocket(new InetSocketAddress(bindAddress,port),null).getDatagramSocket();
+        try {
+            return StunUtil.getDemultiplexerSocket(new InetSocketAddress(bindAddress, port), null).getDatagramSocket();
+        } catch (IOException ex) {
+            throw (SocketException) new SocketException().initCause(ex);
+        }
     }
 
     @Override
@@ -84,6 +91,4 @@ public class SipNetworkLayer implements gov.nist.core.net.NetworkLayer {
     public SSLSocket createSSLSocket(InetAddress ia, int i, InetAddress ia1) throws IOException {
         throw new UnsupportedOperationException("Not supported yet.");
     }
-
-
 }

@@ -3,8 +3,8 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>net.mc_cubed.sip</groupId>
     <artifactId>SipTools</artifactId>
+    <version>1.0.alpha1</version>
     <packaging>pom</packaging>
-    <version>1.0-SNAPSHOT</version>
     <name>Sip Tools Composite</name>
     <url>http://maven.apache.org</url>
     <modules>
@@ -84,6 +84,11 @@
         </plugins>
     </build>
     <repositories>
+        <repository>
+            <id>glassfish-maven2-repository.dev.java.net</id>
+            <name>Java.net Maven 2 Repository for GlassFish</name>
+            <url>http://download.java.net/maven/glassfish/</url>
+        </repository>
         <repository>
             <id>Java.net Maven 2</id>
             <name>Java.net repository</name>

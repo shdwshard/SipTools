@@ -21,12 +21,10 @@ package net.mc_cubed.icedjava.ice;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import javax.sdp.SdpException;
 import javax.sdp.SdpParseException;
-import org.jboss.netty.channel.ChannelPipelineCoverage;
 
 /**
  * Extends the IceStateMachine and implements the IcePeer interface to form a
@@ -37,7 +35,6 @@ import org.jboss.netty.channel.ChannelPipelineCoverage;
  * @see IceStateMachine
  * @see IcePeer
  */
-@ChannelPipelineCoverage(ChannelPipelineCoverage.ONE)
 class IcePeerImpl extends IceStateMachine implements IcePeer {
 
 
@@ -73,11 +70,10 @@ class IcePeerImpl extends IceStateMachine implements IcePeer {
         }
 
         this.peerId = peerId;
-        this.setIceSockets(sockets);
 
         if (agentRole == AgentRole.CONTROLLED) {
-            this.setRemoteUFrag(uFrag);
-            this.setRemotePassword(password);
+            setRemoteUFrag(uFrag);
+            setRemotePassword(password);
         }
 
         // Set up the LocalCandidates for each Media Description

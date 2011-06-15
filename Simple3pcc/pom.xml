@@ -5,7 +5,7 @@
   <parent>
     <artifactId>SipTools</artifactId>
     <groupId>net.mc_cubed.sip</groupId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0.alpha1</version>
   </parent>
   <groupId>net.mc_cubed</groupId>
   <artifactId>Simple3pcc</artifactId>

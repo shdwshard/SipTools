@@ -20,10 +20,9 @@
 package net.mc_cubed.icedjava.stun;
 
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
+import java.util.concurrent.Future;
 import net.mc_cubed.icedjava.packet.StunPacket;
-import org.jboss.netty.channel.ChannelFuture;
 
 /**
  *
@@ -33,9 +32,7 @@ public interface StunPacketSender {
 
     void setMaxRetries(int retries);
     
-    ChannelFuture send(SocketAddress remoteSocket, StunPacket packet) throws IOException;
-
-    ChannelFuture send(InetAddress addr, int port, StunPacket packet) throws IOException;
+    Future<StunReply> doTest(InetSocketAddress server, StunPacket request) throws InterruptedException, IOException;
 
     public void storeAndNotify(StunPacket packet);
 }

@@ -20,6 +20,7 @@
 package net.mc_cubed.icedjava.ice;
 
 import java.io.IOException;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Queue;
@@ -44,7 +45,7 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
 
     protected HashSet<IceEventListener> listeners = new HashSet<IceEventListener>();
     protected final static Logger log = Logger.getLogger(IceDatagramSocketChannel.class.getName());
-    protected final IceSocket iceSocket;
+    protected final IceDatagramSocket iceSocket;
     protected Queue<PeerAddressedByteBuffer> queue = new LinkedBlockingQueue<PeerAddressedByteBuffer>();
     @Inject
     Event<IceEvent> eventBroadcaster;
@@ -68,7 +69,7 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
         return component;
     }
 
-    IceDatagramSocketChannel(IceSocket socket, short channel) {
+    IceDatagramSocketChannel(IceDatagramSocket socket, short channel) {
         this.iceSocket = socket;
         this.component = channel;
     }
@@ -126,6 +127,7 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
     public int read(ByteBuffer dst) throws IOException {
         PeerAddressedByteBuffer src = queue.poll();
         dst.put(src.getBuffer());
+        dst.flip();
         return dst.remaining();
     }
 
@@ -133,6 +135,7 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
     public IcePeer receive(ByteBuffer dst) throws IOException {
         PeerAddressedByteBuffer src = queue.poll();
         dst.put(src.getBuffer());
+        dst.flip();
         return src.getPeer();
     }
 
@@ -152,8 +155,13 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
     }
 
     @Override
-    public void stunEvent(StunEvent event) {
+    public void stunEvent(StunEvent event) {        
         if (event instanceof net.mc_cubed.icedjava.stun.event.BytesAvailableEvent) {
+            net.mc_cubed.icedjava.stun.event.BytesAvailableEvent bytesEvent = (net.mc_cubed.icedjava.stun.event.BytesAvailableEvent) event;
+            ByteBuffer buffer = ByteBuffer.allocate(4096);
+            SocketAddress address = bytesEvent.getChannel().receive(buffer);
+            IcePeer peer = iceSocket.translateSocketAddressToPeer(address,component);
+            queue.add(new PeerAddressedByteBuffer(peer,buffer));
             fireEvent(new BytesAvailableEventImpl(this));
         }
     }

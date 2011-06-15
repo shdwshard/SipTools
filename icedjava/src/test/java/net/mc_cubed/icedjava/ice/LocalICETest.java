@@ -167,7 +167,7 @@ public class LocalICETest extends TestCase {
                             ByteBuffer buffer = ByteBuffer.allocate(StunUtil.MAX_PACKET_SIZE);
                             bytesEvent.getSocketChannel().read(buffer);
                             System.out.println("Received Datagram: " + buffer);
-                            System.arraycopy(buffer.array(), buffer.arrayOffset(), data, 0, buffer.remaining());
+                            System.arraycopy(buffer.array(), buffer.arrayOffset() + buffer.position(), data, 0, Math.min(buffer.remaining(),data.length));
                         } catch (IOException ex) {
                             Logger.getLogger(LocalICETest.class.getName()).log(Level.SEVERE, null, ex);
                         }
@@ -178,7 +178,8 @@ public class LocalICETest extends TestCase {
 
             ByteBuffer bb = ByteBuffer.allocate(8);
             bb.put("Testing".getBytes());
-            localSockets[0].write(bb, (short)0);
+            bb.flip();
+            localSockets[0].write(bb, (short) 0);
 
             // Wait for the data to arrive
             Thread.sleep(100);
@@ -189,11 +190,14 @@ public class LocalICETest extends TestCase {
             //System.out.println(localPeer.createOffer());
             //System.out.println(remotePeer.createOffer());
         } finally {
-            localPeer.setSdpListener(null);
-            remotePeer.setSdpListener(null);
-
-            localPeer.close();
-            remotePeer.close();
+            if (localPeer != null) {
+                localPeer.setSdpListener(null);
+                localPeer.close();
+            }
+            if (remotePeer != null) {
+                remotePeer.setSdpListener(null);
+                remotePeer.close();
+            }
 
             if (form != null) {
                 form.setVisible(false);
@@ -313,7 +317,7 @@ public class LocalICETest extends TestCase {
                             ByteBuffer buffer = ByteBuffer.allocate(StunUtil.MAX_PACKET_SIZE);
                             bytesEvent.getSocketChannel().read(buffer);
                             System.out.println("Received Datagram: " + buffer);
-                            System.arraycopy(buffer.array(), buffer.arrayOffset(), data, 0, buffer.remaining());
+                            System.arraycopy(buffer.array(), buffer.arrayOffset() + buffer.position(), data, 0, Math.min(buffer.remaining(),data.length));
                         } catch (IOException ex) {
                             Logger.getLogger(LocalICETest.class.getName()).log(Level.SEVERE, null, ex);
                         }
@@ -324,7 +328,8 @@ public class LocalICETest extends TestCase {
 
             ByteBuffer bb = ByteBuffer.allocate(8);
             bb.put("Testing".getBytes());
-            localSockets[0].write(bb, (short)0);
+            bb.flip();
+            localSockets[0].write(bb, (short) 0);
 
             // Wait for the data to arrive
             Thread.sleep(100);
@@ -335,11 +340,14 @@ public class LocalICETest extends TestCase {
             //System.out.println(localPeer.createOffer());
             //System.out.println(remotePeer.createOffer());
         } finally {
-            localPeer.setSdpListener(null);
-            remotePeer.setSdpListener(null);
-
-            localPeer.close();
-            remotePeer.close();
+            if (localPeer != null) {
+                localPeer.setSdpListener(null);
+                localPeer.close();
+            }
+            if (remotePeer != null) {
+                remotePeer.setSdpListener(null);
+                remotePeer.close();
+            }
 
             if (form != null) {
                 form.setVisible(false);
@@ -457,7 +465,7 @@ public class LocalICETest extends TestCase {
                             ByteBuffer buffer = ByteBuffer.allocate(StunUtil.MAX_PACKET_SIZE);
                             bytesEvent.getSocketChannel().read(buffer);
                             System.out.println("Received Datagram: " + buffer);
-                            System.arraycopy(buffer.array(), buffer.arrayOffset(), data, 0, buffer.remaining());
+                            System.arraycopy(buffer.array(), buffer.arrayOffset() + buffer.position(), data, 0, Math.min(buffer.remaining(),data.length));
                         } catch (IOException ex) {
                             Logger.getLogger(LocalICETest.class.getName()).log(Level.SEVERE, null, ex);
                         }
@@ -468,7 +476,8 @@ public class LocalICETest extends TestCase {
 
             ByteBuffer bb = ByteBuffer.allocate(8);
             bb.put("Testing".getBytes());
-            localSockets[0].write(bb, (short)0);
+            bb.flip();
+            localSockets[0].write(bb, (short) 0);
 
             // Wait for the data to arrive
             Thread.sleep(100);
@@ -480,11 +489,14 @@ public class LocalICETest extends TestCase {
             //System.out.println(remotePeer.createOffer());
 
         } finally {
-            localPeer.setSdpListener(null);
-            remotePeer.setSdpListener(null);
-
-            localPeer.close();
-            remotePeer.close();
+            if (localPeer != null) {
+                localPeer.setSdpListener(null);
+                localPeer.close();
+            }
+            if (remotePeer != null) {
+                remotePeer.setSdpListener(null);
+                remotePeer.close();
+            }
 
             if (form != null) {
                 form.setVisible(false);
@@ -606,7 +618,7 @@ public class LocalICETest extends TestCase {
                             ByteBuffer buffer = ByteBuffer.allocate(StunUtil.MAX_PACKET_SIZE);
                             bytesEvent.getSocketChannel().read(buffer);
                             System.out.println("Received Datagram: " + buffer);
-                            System.arraycopy(buffer.array(), buffer.arrayOffset(), data, 0, buffer.remaining());
+                            System.arraycopy(buffer.array(), buffer.arrayOffset() + buffer.position(), data, 0, Math.min(buffer.remaining(),data.length));
                         } catch (IOException ex) {
                             Logger.getLogger(LocalICETest.class.getName()).log(Level.SEVERE, null, ex);
                         }
@@ -617,7 +629,8 @@ public class LocalICETest extends TestCase {
 
             ByteBuffer bb = ByteBuffer.allocate(8);
             bb.put("Testing".getBytes());
-            localSockets[0].write(bb, (short)0);
+            bb.flip();
+            localSockets[0].write(bb, (short) 0);
 
             // Wait for the data to arrive
             Thread.sleep(100);
@@ -629,11 +642,14 @@ public class LocalICETest extends TestCase {
             //System.out.println(remotePeer.createOffer());
 
         } finally {
-            localPeer.setSdpListener(null);
-            remotePeer.setSdpListener(null);
-
-            localPeer.close();
-            remotePeer.close();
+            if (localPeer != null) {
+                localPeer.setSdpListener(null);
+                localPeer.close();
+            }
+            if (remotePeer != null) {
+                remotePeer.setSdpListener(null);
+                remotePeer.close();
+            }
 
             if (form != null) {
                 form.setVisible(false);

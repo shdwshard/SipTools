@@ -21,8 +21,8 @@ package net.mc_cubed.icedjava.stun;
 
 import net.mc_cubed.icedjava.packet.StunPacket;
 import java.net.DatagramPacket;
+import java.nio.ByteBuffer;
 import javax.inject.Named;
-import org.jboss.netty.buffer.ChannelBuffer;
 
 /**
  *
@@ -49,15 +49,15 @@ public class StunFactory {
         return new StunPacketImpl(packet, auth);
     }
 
-    public StunPacket processChannelBuffer(ChannelBuffer buffer) {
-        StunPacket retval = new StunPacketImpl(buffer.toByteBuffer().array(),buffer.readerIndex(),buffer.readableBytes(),null);
-        buffer.skipBytes(buffer.readableBytes());
+    public StunPacket processByteBuffer(ByteBuffer buffer) {
+        StunPacket retval = new StunPacketImpl(buffer.array(),buffer.arrayOffset(),buffer.remaining(),null);
+        buffer.position(buffer.capacity());
         return retval;
     }
 
-    public StunPacket processChannelBuffer(ChannelBuffer buffer, StunAuthenticator auth) {
-        StunPacket retval = new StunPacketImpl(buffer.toByteBuffer().array(),buffer.readerIndex(),buffer.readableBytes(),auth);
-        buffer.skipBytes(buffer.readableBytes());
+    public StunPacket processByteBuffer(ByteBuffer buffer, StunAuthenticator auth) {
+        StunPacket retval = new StunPacketImpl(buffer.array(),buffer.arrayOffset(),buffer.remaining(),auth);
+        buffer.position(buffer.capacity());
         return retval;
     }
 }

@@ -21,7 +21,6 @@ package net.mc_cubed.icedjava.ice;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
-import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import javax.sdp.Media;

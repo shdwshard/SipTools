@@ -4,6 +4,7 @@
  */
 package net.mc_cubed.icedjava.stun;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -11,7 +12,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.enterprise.inject.Produces;
@@ -21,15 +21,16 @@ import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
 import net.mc_cubed.icedjava.stun.annotation.StunServer;
 import net.mc_cubed.icedjava.stun.event.StunEventListener;
-import org.jboss.netty.bootstrap.ConnectionlessBootstrap;
-import org.jboss.netty.channel.ChannelFactory;
-import org.jboss.netty.channel.ChannelHandler;
-import org.jboss.netty.channel.ChannelPipeline;
-import org.jboss.netty.channel.ChannelPipelineFactory;
-import org.jboss.netty.channel.Channels;
-import org.jboss.netty.channel.socket.DatagramChannel;
-import org.jboss.netty.channel.socket.nio.NioDatagramChannelFactory;
-import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
+import org.glassfish.grizzly.Transport;
+import org.glassfish.grizzly.Transport.State;
+import org.glassfish.grizzly.filterchain.Filter;
+import org.glassfish.grizzly.filterchain.FilterChainBuilder;
+import org.glassfish.grizzly.filterchain.TransportFilter;
+import org.glassfish.grizzly.nio.transport.TCPNIOTransport;
+import org.glassfish.grizzly.nio.transport.TCPNIOTransportBuilder;
+import org.glassfish.grizzly.nio.transport.UDPNIOServerConnection;
+import org.glassfish.grizzly.nio.transport.UDPNIOTransport;
+import org.glassfish.grizzly.nio.transport.UDPNIOTransportBuilder;
 import org.xbill.DNS.AAAARecord;
 import org.xbill.DNS.ARecord;
 import org.xbill.DNS.Lookup;
@@ -56,7 +57,6 @@ public class StunUtil {
     //        "stun.ipshka.com"   // Getting timeouts with this server
     };
     public static Integer STUN_PORT = 3478;
-    
     // This really should be adjusted to match some established standard
     public static Integer MAX_PACKET_SIZE = 4096;
 
@@ -142,103 +142,152 @@ public class StunUtil {
         return null;
     }
 
-    public static DatagramStunSocket getStunSocket(InetSocketAddress address, final StunListenerType stunType) {
-        ConnectionlessBootstrap bootstrap = new ConnectionlessBootstrap(getNioDatagramChannelFactory());
-        bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
+    public static DatagramStunSocket getStunSocket(InetSocketAddress address, final StunListenerType stunType) throws IOException {
+        // Create a FilterChain using FilterChainBuilder
+        FilterChainBuilder filterChainBuilder = FilterChainBuilder.stateless();
 
-            @Override
-            public ChannelPipeline getPipeline() throws Exception {
-                ChannelPipeline pipeline = Channels.pipeline();
-                pipeline.addLast("DatagramStunSocket", new DatagramStunSocket());
-                switch (stunType) {
-                    case SERVER:
-                    case BOTH:
-                        pipeline.addFirst("StunRequestHandler", new DefaultStunServerHandler());
-                        break;
-                    case CLIENT:
-                    default:
-                        break;
-                }
-                pipeline.addFirst("StunPacketDecoder", new StunPacketDecoder());
-                pipeline.addFirst("StunPacketEncoder", new StunPacketEncoder());
-                return pipeline;
-            }
-        });
-        DatagramChannel channel = (DatagramChannel) bootstrap.bind(address);
+        // Add TransportFilter, which is responsible for reading and writing 
+        //  data to the connection
+        filterChainBuilder.add(new TransportFilter());
 
-        return (DatagramStunSocket) channel.getPipeline().get("DatagramStunSocket");
+        // Add the transcoding filter to go from Grizzly Buffers to NIO buffers
+        filterChainBuilder.add(new ByteBufferGrizzlyProtocolFilter());
+
+        // Add the packet encoding/decoding filter which does the format
+        //  translation for STUN packets
+        filterChainBuilder.add(new StunPacketProtocolFilter());
+
+        switch (stunType) {
+            case SERVER:
+            case BOTH:
+                // If this socket should respond to STUN packets, add the
+                //  default stun handler
+                filterChainBuilder.add(new DefaultStunServerHandler());
+                break;
+            case CLIENT:
+            default:
+                break;
+        }
+
+        // Finally, add the stunSocket class to the top of the chain
+        DatagramStunSocket socket = new DatagramStunSocket();
+        filterChainBuilder.add(socket);
+
+        // Get the underlying datagram transport
+        UDPNIOTransport transport = getDatagramTransport();
+
+        UDPNIOServerConnection connection = transport.bind(address);
+
+        connection.setProcessor(filterChainBuilder.build());
+                
+        socket.setServerConnection(connection);
+
+        return socket;
     }
 
-    public static DatagramStunSocket getStunSocket(int port, StunListenerType stunType) {
+    public static DatagramStunSocket getStunSocket(int port, StunListenerType stunType) throws IOException {
         return getStunSocket(new InetSocketAddress(port), stunType);
     }
 
-    public static DatagramStunSocket getStunSocket(InetAddress address, int port, StunListenerType stunType) {
+    public static DatagramStunSocket getStunSocket(InetAddress address, int port, StunListenerType stunType) throws IOException {
         return getStunSocket(new InetSocketAddress(address, port), stunType);
     }
 
-    public static DatagramDemultiplexerSocket getCustomStunPipeline(InetSocketAddress address, final ChannelHandler stunHandler) {
-        ConnectionlessBootstrap bootstrap = new ConnectionlessBootstrap(getNioDatagramChannelFactory());
-        bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
+    public static DatagramDemultiplexerSocket getCustomStunPipeline(InetSocketAddress address, final Filter stunFilter) throws IOException {
+        // Create a FilterChain using FilterChainBuilder
+        FilterChainBuilder filterChainBuilder = FilterChainBuilder.stateless();
 
-            @Override
-            public ChannelPipeline getPipeline() throws Exception {
-                ChannelPipeline pipeline = Channels.pipeline();
-                pipeline.addLast("DatagramStunSocket", new DatagramDemultiplexerSocket(null));
-                pipeline.addFirst("StunRequestHandler", stunHandler);
-                pipeline.addFirst("StunPacketDecoder", new StunPacketDecoder());
-                pipeline.addFirst("StunPacketEncoder", new StunPacketEncoder());
-                return pipeline;
-            }
-        });
-        DatagramChannel channel = (DatagramChannel) bootstrap.bind(address);
-        return (DatagramDemultiplexerSocket) channel.getPipeline().get("DatagramStunSocket");
+        // Add TransportFilter, which is responsible for reading and writing 
+        //  data to the connection
+        filterChainBuilder.add(new TransportFilter());
+
+        // Add the transcoding filter to go from Grizzly Buffers to NIO buffers
+        filterChainBuilder.add(new ByteBufferGrizzlyProtocolFilter());
+
+        // Add the packet encoding/decoding filter which does the format
+        //  translation for STUN packets
+        filterChainBuilder.add(new StunPacketProtocolFilter());
+
+        // Add the custom stun filter.  This filter may also, optionally handle
+        //  data packets
+        filterChainBuilder.add(stunFilter);
+
+        // Finally, add the stunSocket class to the top of the chain
+        DatagramDemultiplexerSocket socket = new DatagramDemultiplexerSocket(null);
+        filterChainBuilder.add(socket);
+
+        // Get the underlying datagram transport
+        UDPNIOTransport transport = getDatagramTransport();
+
+
+        UDPNIOServerConnection connection = transport.bind(address);
+
+        // Add the filter chain
+        connection.setProcessor(filterChainBuilder.build());
+        
+        socket.setServerConnection(connection);
+
+        return socket;
     }
 
-    public static DatagramDemultiplexerSocket getCustomStunPipeline(int port, final ChannelHandler stunHandler) {
-        return getCustomStunPipeline(new InetSocketAddress(port),stunHandler);
+    public static DatagramDemultiplexerSocket getCustomStunPipeline(int port, final Filter stunFilter) throws IOException {
+        return getCustomStunPipeline(new InetSocketAddress(port), stunFilter);
     }
 
-    public static DatagramDemultiplexerSocket getCustomStunPipeline(InetAddress address, int port, final ChannelHandler stunHandler) {
-        return getCustomStunPipeline(new InetSocketAddress(address,port),stunHandler);
+    public static DatagramDemultiplexerSocket getCustomStunPipeline(InetAddress address, int port, final Filter stunFilter) throws IOException {
+        return getCustomStunPipeline(new InetSocketAddress(address, port), stunFilter);
     }
 
-    public static DatagramDemultiplexerSocket getCustomStunPipeline(final ChannelHandler stunHandler) {
-        return getCustomStunPipeline(new InetSocketAddress(0),stunHandler);
+    public static DatagramDemultiplexerSocket getCustomStunPipeline(final Filter stunFilter) throws IOException {
+        return getCustomStunPipeline(new InetSocketAddress(0), stunFilter);
     }
 
-    public static DatagramStunSocket getStunSocket(InetAddress address, int port, ChannelHandler stunHandler) {
-        return getCustomStunPipeline(new InetSocketAddress(address, port), stunHandler);
+    public static DatagramDemultiplexerSocket getDemultiplexerSocket(InetAddress address, int port) throws IOException {
+        return getDemultiplexerSocket(new InetSocketAddress(address, port), null);
     }
 
-    public static DatagramDemultiplexerSocket getDemultiplexerSocket(InetAddress address, int port) {
-        return getDemultiplexerSocket(new InetSocketAddress(address,port), null);
-    }
-
-    public static DatagramDemultiplexerSocket getDemultiplexerSocket(int port) {
+    public static DatagramDemultiplexerSocket getDemultiplexerSocket(int port) throws IOException {
         return getDemultiplexerSocket(new InetSocketAddress(port), null);
     }
 
-    public static DatagramDemultiplexerSocket getDemultiplexerSocket() {
+    public static DatagramDemultiplexerSocket getDemultiplexerSocket() throws IOException {
         return getDemultiplexerSocket((InetSocketAddress) null, null);
     }
 
-    public static DatagramDemultiplexerSocket getDemultiplexerSocket(InetSocketAddress inetSocketAddress, final StunEventListener stunEventListener) {
-        ConnectionlessBootstrap bootstrap = new ConnectionlessBootstrap(getNioDatagramChannelFactory());
-        bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
+    public static DatagramDemultiplexerSocket getDemultiplexerSocket(InetSocketAddress inetSocketAddress, final StunEventListener stunEventListener) throws IOException {
+        // Create a FilterChain using FilterChainBuilder
+        FilterChainBuilder filterChainBuilder = FilterChainBuilder.stateless();
 
-            @Override
-            public ChannelPipeline getPipeline() throws Exception {
-                ChannelPipeline pipeline = Channels.pipeline();
-                pipeline.addFirst("DatagramStunSocket", new DatagramDemultiplexerSocket(stunEventListener));
-                pipeline.addFirst("StunRequestHandler", new DefaultStunServerHandler());
-                pipeline.addFirst("StunPacketDecoder", new StunPacketDecoder());
-                pipeline.addFirst("StunPacketEncoder", new StunPacketEncoder());
-                return pipeline;
-            }
-        });
-        DatagramChannel channel = (DatagramChannel) bootstrap.bind(inetSocketAddress);
-        return (DatagramDemultiplexerSocket) channel.getPipeline().get("DatagramStunSocket");
+        // Add TransportFilter, which is responsible for reading and writing 
+        //  data to the connection
+        filterChainBuilder.add(new TransportFilter());
+
+        // Add the transcoding filter to go from Grizzly Buffers to NIO buffers
+        filterChainBuilder.add(new ByteBufferGrizzlyProtocolFilter());
+
+        // Add the packet encoding/decoding filter which does the format
+        //  translation for STUN packets
+        filterChainBuilder.add(new StunPacketProtocolFilter());
+
+        // This socket should respond to STUN packets, so add the default stun
+        //  handler
+        filterChainBuilder.add(new DefaultStunServerHandler());
+
+        // Finally, add the stunSocket class to the top of the chain
+        DatagramDemultiplexerSocket socket = new DatagramDemultiplexerSocket(null);
+        filterChainBuilder.add(socket);
+
+        // Get the underlying datagram transport
+        UDPNIOTransport transport = getDatagramTransport();
+
+        UDPNIOServerConnection connection = transport.bind(inetSocketAddress);
+
+        // Add the filter chain
+        connection.setProcessor(filterChainBuilder.build());
+        
+        socket.setServerConnection(connection);
+        
+        return socket;
     }
 
     public static InetSocketAddress[] getStunServerByName(String address) {
@@ -286,43 +335,38 @@ public class StunUtil {
         return retval.toArray(new InetSocketAddress[0]);
 
     }
-    protected static NioServerSocketChannelFactory socketChannelFactory = null;
-    protected static NioDatagramChannelFactory datagramChannelFactory = null;
+    protected static TCPNIOTransport streamTransport = null;
+    protected static UDPNIOTransport datagramTransport = null;
 
     @Produces
-    public static NioServerSocketChannelFactory getNioServerSocketChannelFactory() {
-        if (socketChannelFactory == null) {
-            socketChannelFactory = new NioServerSocketChannelFactory(
-                    Executors.newCachedThreadPool(),
-                    Executors.newCachedThreadPool());
-            final ChannelFactory datagramChannelFactoryShutdownInstance = socketChannelFactory;
-            Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
-
-                @Override
-                public void run() {
-                    datagramChannelFactoryShutdownInstance.releaseExternalResources();
-                }
-            }));
+    public static TCPNIOTransport getServerSocketChannelFactory() {
+        //return TCPNIOTransportBuilder.newInstance().build();
+        if (streamTransport == null) {
+            streamTransport = TCPNIOTransportBuilder.newInstance().build();
+            try {
+                streamTransport.start();
+            } catch (IOException ex) {
+                Logger.getLogger(StunUtil.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            Runtime.getRuntime().addShutdownHook(new Thread(new TransportShutdownRunnable(streamTransport)));
 
         }
-        return socketChannelFactory;
+        return streamTransport;
     }
 
     @Produces
-    public static NioDatagramChannelFactory getNioDatagramChannelFactory() {
-        if (datagramChannelFactory == null) {
-            datagramChannelFactory = new NioDatagramChannelFactory(
-                    Executors.newCachedThreadPool());
-            final ChannelFactory datagramChannelFactoryShutdownInstance = datagramChannelFactory;
-            Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
-
-                @Override
-                public void run() {
-                    datagramChannelFactoryShutdownInstance.releaseExternalResources();
-                }
-            }));
+    public static UDPNIOTransport getDatagramTransport() {
+        //return UDPNIOTransportBuilder.newInstance().build();
+        if (datagramTransport == null) {
+            datagramTransport = UDPNIOTransportBuilder.newInstance().build();
+            try {
+                datagramTransport.start();
+            } catch (IOException ex) {
+                Logger.getLogger(StunUtil.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            Runtime.getRuntime().addShutdownHook(new Thread(new TransportShutdownRunnable(datagramTransport)));
         }
-        return datagramChannelFactory;
+        return datagramTransport;
     }
     protected static InetSocketAddress cachedStunServerSocket = null;
 
@@ -345,5 +389,25 @@ public class StunUtil {
 
     public static StunPacket createStunRequest(MessageClass messageClass, MessageMethod messageMethod) {
         return new StunPacketImpl(messageClass, messageMethod);
+    }
+
+    static class TransportShutdownRunnable implements Runnable {
+
+        Transport transport;
+
+        TransportShutdownRunnable(Transport transport) {
+            this.transport = transport;
+        }
+
+        @Override
+        public void run() {
+            try {
+                if (transport.getState().getState() == State.START) {
+                    transport.stop();
+                }
+            } catch (IOException ex) {
+                Logger.getLogger(StunUtil.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
     }
 }

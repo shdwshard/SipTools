@@ -82,7 +82,6 @@ class AbstractIceSocketChannel implements IceSocketChannel, StunEventListener {
     @Override
     public int read(ByteBuffer bb) throws IOException {
         receive(bb);
-
         return bb.remaining();
     }
 
@@ -121,6 +120,7 @@ class AbstractIceSocketChannel implements IceSocketChannel, StunEventListener {
         PeerAddressedByteBuffer inBuffer = queue.poll();
 
         dst.put(inBuffer.getBuffer());
+        dst.flip();
         return inBuffer.getPeer();
     }
 
