@@ -20,8 +20,11 @@
 package net.mc_cubed.icedjava.stun;
 
 /**
+ * Stun Authenticators are supplied a username and realm, and expected to supply
+ * a plaintext password to be used during STUN authorization requests.
  *
  * @author Charles Chappell
+ * @since 0.9
  */
 public interface StunAuthenticator {
 

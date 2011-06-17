@@ -65,7 +65,6 @@ import net.mc_cubed.icedjava.ice.upnp.IceUPNPBridge;
 import net.mc_cubed.icedjava.packet.StunPacket;
 import net.mc_cubed.icedjava.packet.attribute.AttributeFactory;
 import net.mc_cubed.icedjava.packet.attribute.AttributeType;
-import net.mc_cubed.icedjava.packet.attribute.ErrorCodeAttribute;
 import net.mc_cubed.icedjava.packet.attribute.FingerprintAttribute;
 import net.mc_cubed.icedjava.packet.attribute.IceControlledAttribute;
 import net.mc_cubed.icedjava.packet.attribute.IceControllingAttribute;
@@ -714,7 +713,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             switch (stunPacket.getMessageClass()) {
                 case REQUEST:
                 case INDICATION:
-                    processPacket(stunPacket, (SocketAddress)ctx.getAddress(), ctx);
+                    processPacket(stunPacket, (SocketAddress) ctx.getAddress(), ctx);
                     return ctx.getStopAction();
             }
         }
@@ -819,7 +818,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                     && fromPeer.getTieBreaker() < remoteTieBreaker)) {
 
                 StunPacket response = StunUtil.createReplyPacket(packet, MessageClass.ERROR);
-                response.getAttributes().add(new ErrorCodeAttribute(ROLE_CONFLICT, ROLE_CONFLICT_REASON));
+                response.getAttributes().add(AttributeFactory.createErrorCodeAttribute(ROLE_CONFLICT, ROLE_CONFLICT_REASON));
                 if (fromPeer.isLocalControlled()) {
                     response.getAttributes().add(AttributeFactory.createIceControllingAttribute(fromPeer.getTieBreaker()));
                 } else {
@@ -987,9 +986,8 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                         log.log(Level.FINE, "Caught an Exception during UPNP procedures.", ex);
                     }
 
-                    // Collect PMP candidates
                     try {
-                        // Collect UPNP candidates
+                        // Collect PMP candidates
                         retval.addAll(new IcePMPBridge().getCandidates(retval));
                     } catch (Exception ex) {
                         log.log(Level.FINE, "Caught an Exception during PMP procedures.", ex);
@@ -1363,12 +1361,12 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      */
     public synchronized void setIceSockets(IceSocket[] sockets) {
         for (IceSocket socket : iceSockets) {
-            ((IceDatagramSocket)socket).removePeer(this);
+            ((IceDatagramSocket) socket).removePeer(this);
         }
         iceSockets.clear();
         iceSockets.addAll(Arrays.asList(sockets));
         for (IceSocket socket : iceSockets) {
-            ((IceDatagramSocket)socket).addPeer(this);
+            ((IceDatagramSocket) socket).addPeer(this);
         }
     }
 
@@ -2121,7 +2119,6 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         nominated.clear();
         socketCache.clear();
         triggeredCheckQueue.clear();
-        socketCache = null;
     }
 
     @Override
@@ -2212,18 +2209,56 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
     @Override
     public List<IceSocketChannel> getChannels(final IceSocket socket) {
-        if (!channels.containsKey(socket) && nominated.containsKey(socket)) {
+        if (!channels.containsKey(socket)) {
             LinkedList<IceSocketChannel> channelList = new LinkedList<IceSocketChannel>();
-            for (short component = (short) 0; component < nominated.get(socket).size(); component++) {
-                channelList.add(new AbstractIceSocketChannel(this, socket, component));
+            for (short component = (short) 0; component < socket.getComponents(); component++) {
+                channelList.add(new IceDatagramSocketChannel(this, socket, component));
             }
             List<LocalCandidate> localCandidates = getLocalCandidates(socket);
             for (LocalCandidate candidate : localCandidates) {
-                candidate.socket.registerStunEventListener((AbstractIceSocketChannel) channelList.get(candidate.getComponentId()));
+                candidate.socket.registerStunEventListener((IceDatagramSocketChannel) channelList.get(candidate.getComponentId()));
             }
             channels.put(socket, channelList);
         }
 
         return channels.get(socket);
+    }
+
+    @Override
+    public boolean hasRemoteAddress(SocketAddress address, IceSocket socket, Short componentId) {
+        if (socket != null) {
+            if (getNominated().get(socket) != null
+                    && getNominated().get(socket).size() > componentId) {
+                List<CandidatePair> pairs = getNominated().get(socket);                
+                if (componentId != null) {
+                    if (pairs.get(componentId).getRemoteCandidate().getSocketAddress().equals(address)) {
+                        return true;
+                    }
+                } else {
+                    for (CandidatePair pair : pairs) {
+                        if (pair.getRemoteCandidate().getSocketAddress().equals(address)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        } else {
+            for (List<CandidatePair> pairs : getNominated().values()) {
+                if (componentId != null) {
+                    if (pairs.get(componentId).getRemoteCandidate().getSocketAddress().equals(address)) {
+                        return true;
+                    }
+                } else {
+                    for (CandidatePair pair : pairs) {
+                        if (pair.getRemoteCandidate().getSocketAddress().equals(address)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        return false;
+
     }
 }

@@ -31,7 +31,7 @@ import java.util.List;
 import javax.enterprise.inject.Produces;
 import javax.inject.Named;
 import net.mc_cubed.icedjava.ice.Candidate.CandidateType;
-import net.mc_cubed.icedjava.stun.StunListenerType;
+import net.mc_cubed.icedjava.stun.StunSocketType;
 import net.mc_cubed.icedjava.stun.StunReply;
 import net.mc_cubed.icedjava.stun.DatagramStunSocket;
 import net.mc_cubed.icedjava.stun.StunUtil;
@@ -123,7 +123,7 @@ public class IceUtil {
                             && !addr.isMulticastAddress()) {
                         try {
                             // Create a stun socket to measure this IP.
-                            socket = StunUtil.getStunSocket(new InetSocketAddress(addr, 0), StunListenerType.CLIENT);
+                            socket = StunUtil.getStunSocket(new InetSocketAddress(addr, 0), StunSocketType.CLIENT);
 
                             socket.setMaxRetries(2);
                             long startTime = new Date().getTime();

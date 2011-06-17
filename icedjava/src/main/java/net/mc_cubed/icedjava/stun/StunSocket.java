@@ -5,8 +5,10 @@
 package net.mc_cubed.icedjava.stun;
 
 /**
+ * Represents a demultiplexing STUN socket interface.
  *
- * @author charles
+ * @author Charles Chappell
+ * @since 1.0
  */
 public interface StunSocket extends StunPacketSender, StunSocketChannel,DemultiplexerSocket {
     

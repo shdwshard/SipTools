@@ -24,8 +24,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
+ * Represents the type of attribute, and maps between the attribute numbers and
+ * POJO representations of those attributes
  *
  * @author Charles Chappell
+ * @since 0.9
  */
 public enum AttributeType {
     // Not an attribute, but an unknown attribute coping mechanism
@@ -39,8 +42,8 @@ public enum AttributeType {
     USERNAME(0x0006, StringAttribute.class),
     _PASSWORD(0x0007, StringAttribute.class),
     MESSAGE_INTEGRITY(0x0008, IntegrityAttributeImpl.class),
-    ERROR_CODE(0x0009, ErrorCodeAttribute.class),
-    UNKNOWN_ATTRIBUTES(0x000A, UnknownAttributesAttribute.class),
+    ERROR_CODE(0x0009, ErrorCodeAttributeImpl.class),
+    UNKNOWN_ATTRIBUTES(0x000A, UnknownAttributesAttributeImpl.class),
     _REFLECTED_FROM(0x000B, MappedAddressAttributeImpl.class),
     CHANNEL_NUMBER(0x000C,GenericAttribute.class),
     LIFETIME(0x000D,GenericAttribute.class),
@@ -81,6 +84,12 @@ public enum AttributeType {
         }
     }
 
+    /**
+     * Lookup an attribute type based on the attribute number
+     * 
+     * @param lookup
+     * @return 
+     */
     public static AttributeType getAttributeType(int lookup) {
         int lookupVal = 0x0000ffff & lookup;
         if (revlookup.containsKey(lookupVal)) {
@@ -97,10 +106,19 @@ public enum AttributeType {
         this.implementationClass = implementationClass;
     }
 
-    public Class getImplementationClass() {
+    /**
+     * Gets the implementation class of this attribute type
+     * @return 
+     */
+    Class getImplementationClass() {
         return implementationClass;
     }
 
+    /**
+     * Get the attribute value used on the wire
+     * 
+     * @return 
+     */
     public int getTypeVal() {
         return typeVal;
     }

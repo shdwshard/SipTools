@@ -19,9 +19,6 @@
  */
 package net.mc_cubed.icedjava.ice;
 
-import java.io.IOException;
-import java.net.DatagramPacket;
-import java.nio.ByteBuffer;
 import java.util.Collection;
 import javax.sdp.Media;
 import javax.sdp.SdpException;
@@ -64,52 +61,12 @@ class IceStreamSocket implements IceSocket {
     }
 
     @Override
-    public int receive(DatagramPacket p, short componentId) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
     public short getComponents() {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
     public boolean isClosed() {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public int write(ByteBuffer data, short componentId) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public int read(ByteBuffer data, short componentId) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public IceSocketChannel[] getSocketChannels() {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public IceSocketChannel getSocketChannel(short componentId) {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public IcePeer receive(ByteBuffer data, short componentId) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public int send(ByteBuffer data, short componentId) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public int sendTo(IcePeer peer, short componentId, ByteBuffer buffer) throws IOException {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 

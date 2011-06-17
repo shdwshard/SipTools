@@ -38,6 +38,11 @@ public class StringUtils {
         (byte) 'c', (byte) 'd', (byte) 'e', (byte) 'f'
     };
 
+    /**
+     * Gets a hex string representation of a byte stream
+     * @param raw raw bytes to make into hex
+     * @return a hex string representation from raw bytes 
+     */
     public static String getHexString(byte[] raw) {
         // Special Case
         if (raw == null) {
@@ -60,6 +65,12 @@ public class StringUtils {
         }
     }
 
+    /**
+     * Gets a hex string representation of a portion of a byte stream
+     * @param raw raw bytes to make into hex
+     * @param length how many bytes to make into hex
+     * @return a hex string representation from length bytes 
+     */
     public static String getHexString(byte[] raw, int length) {
         byte[] hex = new byte[2 * length];
         int index = 0;
@@ -77,6 +88,15 @@ public class StringUtils {
         }
     }
 
+    /**
+     * Gets a hex string representation of a portion of a byte stream starting
+     * at off and ending after length bytes
+     * @param raw raw bytes to make into hex
+     * @param off offset from the beginning of the byte stream to start at
+     * @param length how many bytes to make into hex
+     * @return a hex string representation of length bytes starting at off bytes
+     * into the byte array raw
+     */
     public static String getHexString(byte[] raw, int off, int length) {
         byte[] hex = new byte[2 * length];
         int index = 0;

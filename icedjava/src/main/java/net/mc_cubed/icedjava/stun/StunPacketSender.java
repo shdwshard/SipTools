@@ -25,8 +25,11 @@ import java.util.concurrent.Future;
 import net.mc_cubed.icedjava.packet.StunPacket;
 
 /**
+ * Classes implementing StunPacketSender, are able to perform STUN tests, and
+ * return results asynchronously using a java Future.
  *
  * @author Charles Chappell
+ * @since 0.9
  */
 public interface StunPacketSender {
 

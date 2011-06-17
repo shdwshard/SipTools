@@ -17,21 +17,18 @@
  * License along with IcedJava.  If not, see
  * <http://www.gnu.org/licenses/>.
  */
-
-package net.mc_cubed.icedjava.ice;
-
-import java.net.DatagramPacket;
+package net.mc_cubed.icedjava.stun;
 
 /**
- * Delivers a datagram from an iceSocket.
+ * Indicates whether a STUN socket should be a server, client, or both for the
+ * purposes of doing/responding to STUN tests.
  *
  * @author Charles Chappell
- * @since 0.9
- * @deprecated DatagramListeners are being replaced by SocketChannels
- * @see IceSocketChannel
-*/
-public interface MultiDatagramListener {
+ * @since 1.0
+ */
+public enum StunSocketType {
 
-    public void deliverDatagram(DatagramPacket p,IceSocket source);
-
+    CLIENT,
+    SERVER,
+    BOTH;
 }

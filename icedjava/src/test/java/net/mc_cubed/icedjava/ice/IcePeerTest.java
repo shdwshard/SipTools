@@ -62,7 +62,6 @@ public class IcePeerTest extends TestCase {
      */
     public void testCollectCandidates() throws SocketException, SdpException {
         System.out.println("collectCandidates");
-        int port = 1234;
         SdpFactory factory = SdpFactory.getInstance();
         IceFactory iceFactory = new IceFactory();
         IceSocket[] iceSockets = new IceSocket[]{

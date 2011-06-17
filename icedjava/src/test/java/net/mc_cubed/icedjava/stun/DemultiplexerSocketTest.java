@@ -20,38 +20,46 @@
 package net.mc_cubed.icedjava.stun;
 
 import java.net.InetAddress;
-import java.util.concurrent.TimeUnit;
 import junit.framework.Assert;
 import junit.framework.TestCase;
-import org.junit.Test;
 
 /**
  *
  * @author Charles Chappell
- */ 
+ */
 public class DemultiplexerSocketTest extends TestCase {
 
-    @Test
+    public DemultiplexerSocketTest(String testName) {
+        super(testName);
+    }
+
+    @Override
+    protected void setUp() throws Exception {
+        super.setUp();
+    }
+
+    @Override
+    protected void tearDown() throws Exception {
+        super.tearDown();
+    }
+
     public void testSocket() throws Exception, Throwable {
         System.out.println("socket");
-        DatagramDemultiplexerSocket instance1 = StunUtil.getDemultiplexerSocket(0);
-        DatagramDemultiplexerSocket instance2 = StunUtil.getDemultiplexerSocket(0);
+        DatagramDemultiplexerSocket instance1 = StunUtil.getDemultiplexerSocket(1234);
+        DatagramDemultiplexerSocket instance2 = StunUtil.getDemultiplexerSocket(5678);
 
-        System.out.println("Testing on ports: " + instance1.getLocalPort() + " " + instance2.getLocalPort());
-        
-        StunReply i1reply = instance1.doTest(InetAddress.getByName("127.0.0.1"), instance2.getLocalPort()).get();
-        StunReply i2reply = instance2.doTest(InetAddress.getByName("127.0.0.1"), instance1.getLocalPort()).get();
+        StunReply i1reply = instance1.doTest(InetAddress.getByName("127.0.0.1"), 5678).get();
+        StunReply i2reply = instance2.doTest(InetAddress.getByName("127.0.0.1"), 1234).get();
 
         instance1.close();
         instance2.close();
 
-        Assert.assertTrue("Got wrong reply: " + i1reply + " " + i1reply.getPacket(), i1reply.isSuccess());
-        Assert.assertTrue("Got wrong reply: " + i2reply + " " + i2reply.getPacket(), i2reply.isSuccess());
+        Assert.assertTrue("Got wrong reply: " + i1reply, i1reply.isSuccess());
+        Assert.assertTrue("Got wrong reply: " + i2reply, i2reply.isSuccess());
         Assert.assertEquals("Got wrong reply: " + i1reply,i1reply.getMappedAddress().getAddress().getHostAddress(), "127.0.0.1");
         Assert.assertEquals("Got wrong reply: " + i2reply,i2reply.getMappedAddress().getAddress().getHostAddress(), "127.0.0.1");
-        Assert.assertEquals("Got wrong reply: " + i1reply,i1reply.getMappedAddress().getPort(), instance1.getLocalPort());
-        Assert.assertEquals("Got wrong reply: " + i2reply,i2reply.getMappedAddress().getPort(), instance2.getLocalPort());
+        Assert.assertEquals("Got wrong reply: " + i1reply,i1reply.getMappedAddress().getPort(), 1234);
+        Assert.assertEquals("Got wrong reply: " + i2reply,i2reply.getMappedAddress().getPort(), 5678);
 
     }
-
 }

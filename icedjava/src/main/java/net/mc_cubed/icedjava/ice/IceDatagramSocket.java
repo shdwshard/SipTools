@@ -23,11 +23,9 @@ import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 import javax.sdp.Media;
 import java.io.IOException;
-import java.net.DatagramPacket;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketException;
-import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -89,12 +87,6 @@ public class IceDatagramSocket extends BaseFilter implements IceSocket {
             this.components = null;
         }
         propertyChangeSupport.firePropertyChange(PROP_MEDIA, oldMedia, media);
-
-        IceDatagramSocketChannel[] channels = new IceDatagramSocketChannel[getComponents()];
-        for (short channel = 0; channel < getComponents(); channel++) {
-            channels[channel] = new IceDatagramSocketChannel(this, channel);
-        }
-        setSocketChannels(channels);
     }
     private PropertyChangeSupport propertyChangeSupport = new PropertyChangeSupport(this);
 
@@ -157,11 +149,11 @@ public class IceDatagramSocket extends BaseFilter implements IceSocket {
         return _peers;
     }
 
-    final protected void addPeer(IcePeer peer) {
+    protected void addPeer(IcePeer peer) {
         getPeerMap().put(peer.getLocalUFrag(), peer);
     }
 
-    final protected void removePeer(IcePeer peer) {
+    protected void removePeer(IcePeer peer) {
         getPeerMap().remove(peer.getLocalUFrag());
     }
 
@@ -180,66 +172,6 @@ public class IceDatagramSocket extends BaseFilter implements IceSocket {
     protected IceSocketChannel[] socketChannels;
     public static final String PROP_SOCKETCHANNELS = "socketChannels";
 
-    /**
-     * Get the value of socketChannels
-     *
-     * @return the value of socketChannels
-     */
-    @Override
-    public IceSocketChannel[] getSocketChannels() {
-        return socketChannels;
-    }
-
-    /**
-     * Set the value of socketChannels
-     *
-     * @param socketChannels new value of socketChannels
-     */
-    public void setSocketChannels(IceSocketChannel[] socketChannels) {
-        IceSocketChannel[] oldSocketChannels = this.socketChannels;
-        this.socketChannels = socketChannels;
-        propertyChangeSupport.firePropertyChange(PROP_SOCKETCHANNELS, oldSocketChannels, socketChannels);
-    }
-
-    /**
-     * Get the value of socketChannels at specified index
-     *
-     * @param index
-     * @return the value of socketChannels at specified index
-     */
-    @Override
-    public IceSocketChannel getSocketChannel(short index) {
-        return this.socketChannels[index];
-    }
-
-    /**
-     * Set the value of socketChannels at specified index.
-     *
-     * @param index
-     * @param newSocketChannels new value of socketChannels at specified index
-     */
-    public void setSocketChannels(int index, IceSocketChannel newSocketChannels) {
-        IceSocketChannel oldSocketChannels = this.socketChannels[index];
-        this.socketChannels[index] = newSocketChannels;
-        propertyChangeSupport.fireIndexedPropertyChange(PROP_SOCKETCHANNELS, index, oldSocketChannels, newSocketChannels);
-    }
-
-    @Override
-    public int receive(DatagramPacket p, short componentId) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-/*    @Override
-    public int send(DatagramPacket p, short componentId) throws IOException {
-        int bytesSent = 0;
-        for (IcePeer peer : getPeers()) {
-            IceSocketChannel sink = peer.getChannels(this).get(componentId);
-            ByteBuffer bb = ByteBuffer.allocate(p.getLength());
-            bb.put(p.getData(), p.getOffset(), p.getLength());
-            sink.write(bb);
-        }
-        return bytesSent;
-    }*/
 
     @Override
     public boolean isOpen() {
@@ -261,11 +193,6 @@ public class IceDatagramSocket extends BaseFilter implements IceSocket {
             return components;
         }
 
-    }
-
-    @Override
-    public IcePeer receive(ByteBuffer data, short componentId) throws IOException {
-        return getSocketChannel(componentId).receive(data);
     }
 
     /**
@@ -302,90 +229,20 @@ public class IceDatagramSocket extends BaseFilter implements IceSocket {
 
     }
 
-    /**
-     * Sends data not to a specific ip/port, but to a specific peer
-     * @param peer the peer to send this data to.
-     * @param data the data to send over the channel
-     */
-    public int sendTo(IcePeer peer, short componentId, byte[] data) throws IOException {
-        return sendTo(peer, componentId, data, data.length);
-    }
-
-    /**
-     * Sends data not to a specific ip/port, but to a specific peer
-     * @param peer the peer to send this data to.
-     * @param data the data to send over the channel
-     * @param length the length of the data in the byte array to use
-     */
-    public int sendTo(IcePeer peer, short componentId, byte[] data, int length) throws IOException {
-        return sendTo(peer, componentId, data, 0, length);
-    }
-
-    /**
-     * Sends data not to a specific ip/port, but to a specific peer
-     * @param peer the peer to send this data to.
-     * @param data the data to send over the channel
-     * @param offset where to start copying data from
-     * @param length the length of the data in the byte array to use
-     */
-    public int sendTo(IcePeer peer, short componentId, byte[] data, int offset, int length) throws IOException {
-        ByteBuffer bb = ByteBuffer.wrap(data, offset, length);
-        return sendTo(peer, componentId, bb);
-    }
-
-    /**
-     * Sends data not to a specific ip/port, but to a specific peer
-     * @param peer the peer to send this data to.
-     * @param buffer the packet to send to the peer
-     */
-    @Override
-    public int sendTo(IcePeer peer, short componentId, ByteBuffer buffer) throws IOException {
-        CandidatePair pair = peer.getNominated().get(this).get(componentId);
-        if (pair != null) {
-            int remainingBytes = buffer.remaining();
-            pair.getLocalCandidate().socket.send(buffer, pair.getRemoteCandidate().getSocketAddress());
-            return remainingBytes;
-        } else {
-            throw new IOException("Peer " + peer + " is not connected via " + this);
-        }
-    }
-
     @Override
     public String toString() {
         return getClass().getName() + "[" + hashCode() + "]";
     }
-
-    @Override
-    public int write(ByteBuffer data, short componentId) throws IOException {
-        for (IcePeer peer : getPeerMap().values()) {
-            sendTo(peer, componentId, data);
-        }
-        return 0;
-    }
-
-    @Override
-    public int read(ByteBuffer data, short componentId) throws IOException {
-        return getSocketChannel(componentId).read(data);
-    }
-
-    @Override
-    public int send(ByteBuffer data, short componentId) throws IOException {
-        return write(data,componentId);
-    }
     
-    protected IcePeer translateSocketAddressToPeer(SocketAddress address, short componentId) {
+    protected IcePeer translateSocketAddressToPeer(SocketAddress address, Short componentId) {
         if (socketCache.containsKey(address)) {
             return socketCache.get(address);
         } else {
             IcePeer peer = null;
             for (IcePeer checkPeer : getPeerMap().values()) {
-                if (checkPeer.getNominated().get(this) != null
-                        && checkPeer.getNominated().get(this).size() > componentId) {
-                    CandidatePair pair = checkPeer.getNominated().get(this).get(componentId);
-                    if (pair.getRemoteCandidate().getSocketAddress().equals(address)) {
-                        peer = checkPeer;
-                        break;
-                    }
+                if (checkPeer.hasRemoteAddress(address,this,componentId)) {
+                    peer = checkPeer;
+                    break;
                 }
             }
             if (peer != null) {

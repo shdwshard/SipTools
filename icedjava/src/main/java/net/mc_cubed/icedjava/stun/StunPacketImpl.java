@@ -26,7 +26,6 @@ import net.mc_cubed.icedjava.packet.header.MessageHeader;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
 import net.mc_cubed.icedjava.util.NumericUtils;
 import java.math.BigInteger;
-import java.net.DatagramPacket;
 import java.util.LinkedList;
 import java.util.List;
 import net.mc_cubed.icedjava.packet.StunPacket;
@@ -55,18 +54,9 @@ class StunPacketImpl implements StunPacket {
     }
 
     // Create a new stun packet from bytes
-    public StunPacketImpl(byte[] packetBytes, int off, int len, StunAuthenticator auth) {
+    public StunPacketImpl(byte[] packetBytes, int off, int len) {
         header = new MessageHeader(packetBytes, off, len);
-        attributes = AttributeFactory.processIntoList(packetBytes, off, off + 20, len - 20, auth);
-    }
-
-    // Create a new stun packet from a datagram
-    public StunPacketImpl(DatagramPacket p) {
-        this(p.getData(), p.getOffset(), p.getLength(), null);
-    }
-
-    public StunPacketImpl(DatagramPacket p, StunAuthenticator auth) {
-        this(p.getData(), p.getOffset(), p.getLength(), auth);
+        attributes = AttributeFactory.processIntoList(packetBytes, off, off + 20, len - 20);
     }
 
     @Override

@@ -35,7 +35,7 @@ import java.net.UnknownHostException;
  *
  * @author Charles Chappell
  */
-public class MappedAddressAttributeImpl extends GenericAttribute implements MappedAddressAttribute {
+class MappedAddressAttributeImpl extends GenericAttribute implements MappedAddressAttribute {
 
     private InetAddress address;
     private int port;

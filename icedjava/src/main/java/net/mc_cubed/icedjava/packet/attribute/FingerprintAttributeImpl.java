@@ -26,7 +26,7 @@ import java.util.zip.CRC32;
  *
  * @author Charles Chappell
  */
-public class FingerprintAttributeImpl extends GenericAttribute implements FingerprintAttribute {
+class FingerprintAttributeImpl extends GenericAttribute implements FingerprintAttribute {
 
     long crc32Value;
     boolean valid;

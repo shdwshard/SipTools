@@ -20,8 +20,10 @@
 package net.mc_cubed.icedjava.packet.attribute;
 
 /**
+ * A generic interface representing a STUN attribute
  *
  * @author Charles Chappell
+ * @since 0.9
  */
 public interface Attribute {
 

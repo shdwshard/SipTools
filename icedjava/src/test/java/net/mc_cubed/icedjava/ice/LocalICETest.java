@@ -156,7 +156,7 @@ public class LocalICETest extends TestCase {
             Assert.assertEquals(2, remotePeer.getNominated().size());
 
             final byte[] data = new byte[30];
-            // Test the actual data connection
+            // Attach a listener to component 0 of remotesocket 0
             remotePeer.getChannels(remoteSockets[0]).get(0).addEventListener(new IceEventListener() {
 
                 @Override
@@ -179,7 +179,8 @@ public class LocalICETest extends TestCase {
             ByteBuffer bb = ByteBuffer.allocate(8);
             bb.put("Testing".getBytes());
             bb.flip();
-            localSockets[0].write(bb, (short) 0);
+            // Write to component 0 of localsocket 0
+            localPeer.getChannels(localSockets[0]).get(0).write(bb);
 
             // Wait for the data to arrive
             Thread.sleep(100);
@@ -329,7 +330,8 @@ public class LocalICETest extends TestCase {
             ByteBuffer bb = ByteBuffer.allocate(8);
             bb.put("Testing".getBytes());
             bb.flip();
-            localSockets[0].write(bb, (short) 0);
+            // Write to component 0 of localsocket 0
+            localPeer.getChannels(localSockets[0]).get(0).write(bb);
 
             // Wait for the data to arrive
             Thread.sleep(100);
@@ -477,7 +479,8 @@ public class LocalICETest extends TestCase {
             ByteBuffer bb = ByteBuffer.allocate(8);
             bb.put("Testing".getBytes());
             bb.flip();
-            localSockets[0].write(bb, (short) 0);
+            // Write to component 0 of localsocket 0
+            localPeer.getChannels(localSockets[0]).get(0).write(bb);
 
             // Wait for the data to arrive
             Thread.sleep(100);
@@ -630,7 +633,8 @@ public class LocalICETest extends TestCase {
             ByteBuffer bb = ByteBuffer.allocate(8);
             bb.put("Testing".getBytes());
             bb.flip();
-            localSockets[0].write(bb, (short) 0);
+            // Write to component 0 of localsocket 0
+            localPeer.getChannels(localSockets[0]).get(0).write(bb);
 
             // Wait for the data to arrive
             Thread.sleep(100);

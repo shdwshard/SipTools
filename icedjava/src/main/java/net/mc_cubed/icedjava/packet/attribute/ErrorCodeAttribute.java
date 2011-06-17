@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Charles Chappell.
+ * Copyright 2011 Charles Chappell.
  *
  * This file is part of IcedJava.
  *
@@ -16,57 +16,27 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with IcedJava.  If not, see
  * <http://www.gnu.org/licenses/>.
- */
-package net.mc_cubed.icedjava.packet.attribute;
+ */package net.mc_cubed.icedjava.packet.attribute;
 
 /**
  *
  * @author Charles Chappell
+ * @since 1.0
  */
-public class ErrorCodeAttribute extends GenericAttribute {
-
-    protected String reason;
-
-    /**
-     * Get the value of reason
-     *
-     * @return the value of reason
-     */
-    public String getReason() {
-        return reason;
-    }
-    protected int error;
+public interface ErrorCodeAttribute extends Attribute {
 
     /**
      * Get the value of error
      *
      * @return the value of error
      */
-    public int getError() {
-        return error;
-    }
+    int getError();
 
-    public ErrorCodeAttribute(int error, String reason) {
-        // Set up the members
-        this.error = error;
-        this.reason = reason;
-        this.type = AttributeType.ERROR_CODE;
-        this.length = 4 + reason.length();
-        this.data = new byte[length];
-
-        // Load the error codes into the correct slots
-        data[2] = (byte) (error / 100);
-        data[3] = (byte) (error % 100);
-
-        // Copy the reason code
-        System.arraycopy(reason.getBytes(), 0, data, 4, length - 4);
-
-    }
-
-    public ErrorCodeAttribute(AttributeType type, int length, byte[] value) {
-        super(type, length, value);
-
-        error = data[2] * 100 + data[3];
-        reason = new String(data, 4, length - 4);
-    }
+    /**
+     * Get the value of reason
+     *
+     * @return the value of reason
+     */
+    String getReason();
+    
 }

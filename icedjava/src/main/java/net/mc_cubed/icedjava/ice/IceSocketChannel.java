@@ -20,8 +20,4 @@ public interface IceSocketChannel extends ByteChannel, ScatteringByteChannel, Ga
     void addEventListener(IceEventListener listener);
 
     void removeEventListener(IceEventListener listener);
-
-    IcePeer receive(ByteBuffer dst) throws IOException;
-
-    int send(ByteBuffer src, IcePeer target) throws IOException;
 }

@@ -40,8 +40,10 @@ import org.xbill.DNS.TextParseException;
 import org.xbill.DNS.Type;
 
 /**
- *
- * @author shadow
+ * StunUtil is the entry point into the IcedJava library STUN components.
+ * 
+ * @author Charles Chappell
+ * @since 0.9
  */
 @Named
 public class StunUtil {
@@ -53,8 +55,10 @@ public class StunUtil {
         "stun.softjoys.com",
         //"stun.voipbuster.com", // Getting timeouts with this server
         "stun.voxgratia.org",
-        "stun.xten.com", //        "numb.viagenie.ca", // Getting timeouts with this server
-    //        "stun.ipshka.com"   // Getting timeouts with this server
+        "stun.xten.com",
+        "stun1.noc.ams-ix.net"
+        //"numb.viagenie.ca", // Getting timeouts with this server
+        //"stun.ipshka.com" // Getting timeouts with this server
     };
     public static Integer STUN_PORT = 3478;
     // This really should be adjusted to match some established standard
@@ -78,7 +82,7 @@ public class StunUtil {
             servers.addAll(Arrays.asList(serverList));
 
             Collections.shuffle(servers);
-            DatagramStunSocket testSocket = getStunSocket(new InetSocketAddress(InetAddress.getByName("0.0.0.0"), 0), StunListenerType.CLIENT);
+            DatagramStunSocket testSocket = getStunSocket(new InetSocketAddress(InetAddress.getByName("0.0.0.0"), 0), StunSocketType.CLIENT);
 
             for (String server : servers) {
                 try {
@@ -118,7 +122,7 @@ public class StunUtil {
             servers.addAll(Arrays.asList(serverList));
 
             Collections.shuffle(servers);
-            DatagramStunSocket testSocket = getStunSocket(new InetSocketAddress(InetAddress.getByName("0.0.0.0"), 0), StunListenerType.CLIENT);
+            DatagramStunSocket testSocket = getStunSocket(new InetSocketAddress(InetAddress.getByName("0.0.0.0"), 0), StunSocketType.CLIENT);
 
             for (String server : servers) {
                 try {
@@ -142,7 +146,7 @@ public class StunUtil {
         return null;
     }
 
-    public static DatagramStunSocket getStunSocket(InetSocketAddress address, final StunListenerType stunType) throws IOException {
+    public static DatagramStunSocket getStunSocket(InetSocketAddress address, final StunSocketType stunType) throws IOException {
         // Create a FilterChain using FilterChainBuilder
         FilterChainBuilder filterChainBuilder = FilterChainBuilder.stateless();
 
@@ -179,17 +183,17 @@ public class StunUtil {
         UDPNIOServerConnection connection = transport.bind(address);
 
         connection.setProcessor(filterChainBuilder.build());
-                
+
         socket.setServerConnection(connection);
 
         return socket;
     }
 
-    public static DatagramStunSocket getStunSocket(int port, StunListenerType stunType) throws IOException {
+    public static DatagramStunSocket getStunSocket(int port, StunSocketType stunType) throws IOException {
         return getStunSocket(new InetSocketAddress(port), stunType);
     }
 
-    public static DatagramStunSocket getStunSocket(InetAddress address, int port, StunListenerType stunType) throws IOException {
+    public static DatagramStunSocket getStunSocket(InetAddress address, int port, StunSocketType stunType) throws IOException {
         return getStunSocket(new InetSocketAddress(address, port), stunType);
     }
 
@@ -224,7 +228,7 @@ public class StunUtil {
 
         // Add the filter chain
         connection.setProcessor(filterChainBuilder.build());
-        
+
         socket.setServerConnection(connection);
 
         return socket;
@@ -284,9 +288,9 @@ public class StunUtil {
 
         // Add the filter chain
         connection.setProcessor(filterChainBuilder.build());
-        
+
         socket.setServerConnection(connection);
-        
+
         return socket;
     }
 

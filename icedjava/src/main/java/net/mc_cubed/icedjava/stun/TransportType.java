@@ -20,8 +20,10 @@
 package net.mc_cubed.icedjava.stun;
 
 /**
+ * A utility ENUM used to distinguish between TCP and UDP sockets
  *
  * @author Charles Chappell
+ * @since 0.9
  */
 public enum TransportType {
     UDP,

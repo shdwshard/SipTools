@@ -20,6 +20,9 @@
 package net.mc_cubed.icedjava.packet.header;
 
 /**
+ * MessageClass is used to indicate a class of STUN message, and differentiates
+ * primarily whether the message is a request/indication, or a success/error
+ * reply.
  *
  * @author Charles Chappell
  * @since 0.9

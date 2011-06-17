@@ -69,8 +69,7 @@ public class LocalRTPConnectorTest extends TestCase {
 
         // Create a local peer for a yet unspecified remote peer
         IcePeerImpl localPeer = new IcePeerImpl("localPeer",AgentRole.CONTROLLING,localSockets);
-        // Set local only mode
-        localPeer.setLocalOnly(true);
+
         // Create an SDP offer based on this local peer
         SessionDescription session = localPeer.createOffer();
         // Create a "remote" peer from this SDP info
@@ -99,13 +98,13 @@ public class LocalRTPConnectorTest extends TestCase {
 
 
         long startTime = new Date().getTime();
-        // Wait for the state machines to die, or 30 seconds to pass
-        while (new Date().getTime() - startTime < 30000 && (localPeer.getStatus() == IceStatus.IN_PROGRESS || remotePeer.getStatus() == IceStatus.IN_PROGRESS)) {
+        // Wait for the state machines to die, or 60 seconds to pass
+        while (new Date().getTime() - startTime < 60000 && (localPeer.getStatus() == IceStatus.IN_PROGRESS || remotePeer.getStatus() == IceStatus.IN_PROGRESS)) {
             Thread.sleep(500);
         }
         
-        Assert.assertEquals("ICE processing failed to finish in under 30 seconds",IceStatus.SUCCESS,localPeer.getStatus());
-        Assert.assertEquals("ICE processing failed to finish in under 30 seconds",IceStatus.SUCCESS,remotePeer.getStatus());
+        Assert.assertEquals("ICE processing failed to finish in under 60 seconds",IceStatus.SUCCESS,localPeer.getStatus());
+        Assert.assertEquals("ICE processing failed to finish in under 60 seconds",IceStatus.SUCCESS,remotePeer.getStatus());
 
         // Get the nominated connection
         Assert.assertNotNull(localPeer.getNominated());
@@ -167,7 +166,7 @@ public class LocalRTPConnectorTest extends TestCase {
 
         // Create a local peer for a yet unspecified remote peer
         IcePeerImpl localPeer = new IcePeerImpl("localPeer",AgentRole.CONTROLLING,localSockets);
-        localPeer.setLocalOnly(true);
+
         // Create an SDP offer based on this local peer
         SessionDescription session = localPeer.createOffer();
         // Create a "remote" peer from this SDP info
@@ -194,13 +193,13 @@ public class LocalRTPConnectorTest extends TestCase {
 
 
         long startTime = new Date().getTime();
-        // Wait for the state machines to die, or 30 seconds to pass
-        while (new Date().getTime() - startTime < 30000 && (localPeer.getStatus() == IceStatus.IN_PROGRESS || remotePeer.getStatus() == IceStatus.IN_PROGRESS)) {
+        // Wait for the state machines to die, or 60 seconds to pass
+        while (new Date().getTime() - startTime < 60000 && (localPeer.getStatus() == IceStatus.IN_PROGRESS || remotePeer.getStatus() == IceStatus.IN_PROGRESS)) {
             Thread.sleep(100);
         }
 
-        Assert.assertEquals("ICE processing failed to finish in under 30 seconds",IceStatus.SUCCESS,localPeer.getStatus());
-        Assert.assertEquals("ICE processing failed to finish in under 30 seconds",IceStatus.SUCCESS,remotePeer.getStatus());
+        Assert.assertEquals("ICE processing failed to finish in under 60 seconds",IceStatus.SUCCESS,localPeer.getStatus());
+        Assert.assertEquals("ICE processing failed to finish in under 60 seconds",IceStatus.SUCCESS,remotePeer.getStatus());
 
         // Get the nominated connection
         Assert.assertNotNull(localPeer.getNominated());

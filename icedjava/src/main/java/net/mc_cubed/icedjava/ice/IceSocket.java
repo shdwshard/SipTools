@@ -59,26 +59,6 @@ public interface IceSocket {
      */
     public Collection<IcePeer> getPeers();
 
- //   public void setDatagramListener(DatagramListener listener);
-
-    /**
-     * Receive a datagram packet sent to this socket
-     * @param p
-     * @throws IOException
-     */
-    public int receive(DatagramPacket p, short componentId) throws IOException;
-    public IcePeer receive(ByteBuffer data, short componentId) throws IOException;
-
-    /**
-     * Send a packet on a specific component of this socket
-     * 
-     * @param data
-     * @param componentId
-     * @throws IOException
-     */
-    public int send(ByteBuffer data, short componentId) throws IOException;
-    public int sendTo(IcePeer peer, short componentId, ByteBuffer buffer) throws IOException;
-
     /**
      * Get the number of components making up this flow
      *
@@ -97,13 +77,5 @@ public interface IceSocket {
     public boolean isOpen();
     
     public void close() throws IOException;
-
-    public int write(ByteBuffer data, short componentId) throws IOException;
-    
-    public int read(ByteBuffer data, short componentId) throws IOException;
-    
-    public IceSocketChannel[] getSocketChannels();
-    
-    public IceSocketChannel getSocketChannel(short componentId);
 
 }

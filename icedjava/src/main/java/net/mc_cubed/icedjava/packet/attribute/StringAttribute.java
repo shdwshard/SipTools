@@ -28,7 +28,7 @@ class StringAttribute extends GenericAttribute implements UsernameAttribute,
 
     final String value;
 
-    public StringAttribute(AttributeType type,String value) {
+    protected StringAttribute(AttributeType type,String value) {
         this.type = type;
         length = value.length();
         data = new byte[length];
@@ -36,7 +36,7 @@ class StringAttribute extends GenericAttribute implements UsernameAttribute,
         System.arraycopy(value.getBytes(), 0, data, 0, length);
     }
 
-    public StringAttribute(AttributeType type, int length, byte[] value) {
+    protected StringAttribute(AttributeType type, int length, byte[] value) {
         super(type, length, value);
         this.value = new String(data, 0, length);
     }

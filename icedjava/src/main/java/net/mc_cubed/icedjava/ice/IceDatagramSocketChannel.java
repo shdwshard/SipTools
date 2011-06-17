@@ -24,7 +24,7 @@ import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Queue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.enterprise.event.Event;
@@ -45,10 +45,15 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
 
     protected HashSet<IceEventListener> listeners = new HashSet<IceEventListener>();
     protected final static Logger log = Logger.getLogger(IceDatagramSocketChannel.class.getName());
-    protected final IceDatagramSocket iceSocket;
-    protected Queue<PeerAddressedByteBuffer> queue = new LinkedBlockingQueue<PeerAddressedByteBuffer>();
+    protected final IceSocket iceSocket;
+    protected Queue<ByteBuffer> queue = new ConcurrentLinkedQueue<ByteBuffer>();
     @Inject
     Event<IceEvent> eventBroadcaster;
+    protected final IceStateMachine peer;
+
+    public IcePeer getPeer() {
+        return peer;
+    }
 
     /**
      * Get the value of iceSocket
@@ -69,7 +74,8 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
         return component;
     }
 
-    IceDatagramSocketChannel(IceDatagramSocket socket, short channel) {
+    IceDatagramSocketChannel(IceStateMachine peer, IceSocket socket, short channel) {
+        this.peer = peer;
         this.iceSocket = socket;
         this.component = channel;
     }
@@ -91,8 +97,14 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
 
     @Override
     public int write(ByteBuffer bb) throws IOException {
-        iceSocket.write(bb, component);
-        return bb.remaining();
+        int position = bb.position();
+        try {
+            CandidatePair pair = peer.nominated.get(iceSocket).get(component);
+            pair.localCandidate.socket.send(bb, pair.remoteCandidate.socketAddress);
+        } catch (NullPointerException ex) {
+            log.log(Level.FINEST, "Socket not fully setup before write submitted.  Data is being lost", ex);
+        }
+        return bb.position() - position;
     }
 
     @Override
@@ -125,23 +137,10 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
 
     @Override
     public int read(ByteBuffer dst) throws IOException {
-        PeerAddressedByteBuffer src = queue.poll();
-        dst.put(src.getBuffer());
+        ByteBuffer src = queue.poll();
+        dst.put(src);
         dst.flip();
         return dst.remaining();
-    }
-
-    @Override
-    public IcePeer receive(ByteBuffer dst) throws IOException {
-        PeerAddressedByteBuffer src = queue.poll();
-        dst.put(src.getBuffer());
-        dst.flip();
-        return src.getPeer();
-    }
-
-    @Override
-    public int send(ByteBuffer src, IcePeer target) throws IOException {
-        return iceSocket.sendTo(target,component,src);
     }
 
     @Override
@@ -155,13 +154,12 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
     }
 
     @Override
-    public void stunEvent(StunEvent event) {        
+    public void stunEvent(StunEvent event) {
         if (event instanceof net.mc_cubed.icedjava.stun.event.BytesAvailableEvent) {
             net.mc_cubed.icedjava.stun.event.BytesAvailableEvent bytesEvent = (net.mc_cubed.icedjava.stun.event.BytesAvailableEvent) event;
             ByteBuffer buffer = ByteBuffer.allocate(4096);
             SocketAddress address = bytesEvent.getChannel().receive(buffer);
-            IcePeer peer = iceSocket.translateSocketAddressToPeer(address,component);
-            queue.add(new PeerAddressedByteBuffer(peer,buffer));
+            queue.add(buffer);
             fireEvent(new BytesAvailableEventImpl(this));
         }
     }

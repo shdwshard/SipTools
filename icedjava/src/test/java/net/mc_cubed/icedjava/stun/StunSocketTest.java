@@ -49,8 +49,8 @@ public class StunSocketTest extends TestCase {
 
     public void testSocket() throws Exception, Throwable {
         System.out.println("socket");
-        DatagramStunSocket instance1 = StunUtil.getStunSocket(1234, StunListenerType.BOTH);
-        DatagramStunSocket instance2 = StunUtil.getStunSocket(5678, StunListenerType.BOTH);
+        DatagramStunSocket instance1 = StunUtil.getStunSocket(1234, StunSocketType.BOTH);
+        DatagramStunSocket instance2 = StunUtil.getStunSocket(5678, StunSocketType.BOTH);
 
         StunPacketImpl packet = new StunPacketImpl(MessageClass.REQUEST, MessageMethod.BINDING);
 

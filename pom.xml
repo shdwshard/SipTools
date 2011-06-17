@@ -115,7 +115,7 @@
         </repository>
     </repositories>
     <properties>
-        <buildnumber_plugin.version>1.0-beta-4</buildnumber_plugin.version>
+        <buildnumber_plugin.version>1.0</buildnumber_plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 </project>

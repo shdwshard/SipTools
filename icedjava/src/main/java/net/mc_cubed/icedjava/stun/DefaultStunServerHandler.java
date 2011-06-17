@@ -22,14 +22,11 @@ package net.mc_cubed.icedjava.stun;
 import java.io.IOException;
 import net.mc_cubed.icedjava.packet.attribute.Attribute;
 import net.mc_cubed.icedjava.packet.attribute.AttributeType;
-import net.mc_cubed.icedjava.packet.attribute.ErrorCodeAttribute;
 import net.mc_cubed.icedjava.packet.attribute.SoftwareAttribute;
-import net.mc_cubed.icedjava.packet.attribute.UnknownAttributesAttribute;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.nio.channels.Channels;
 import java.util.LinkedList;
 import java.util.List;
 import net.mc_cubed.icedjava.packet.StunPacket;
@@ -39,10 +36,13 @@ import org.glassfish.grizzly.filterchain.FilterChainContext;
 import org.glassfish.grizzly.filterchain.NextAction;
 
 /**
- *
+ * A grizzly filter which acts as a built-in STUN server, responding to requests
+ * so higher level code doesn't need to bother.
+ * 
  * @author Charles Chappell
+ * @since 1.0
  */
-public class DefaultStunServerHandler extends BaseFilter {
+class DefaultStunServerHandler extends BaseFilter {
 
     static SoftwareAttribute mySoftwareAttribute = AttributeFactory.createSoftwareAttribute(
             "IcedJava 1.0 - Copyright MC Cubed, Inc. of Saitama, Japan, released under LGPL v3.0");
@@ -99,7 +99,7 @@ public class DefaultStunServerHandler extends BaseFilter {
             if (packet.getMethod() != MessageMethod.BINDING) {
                 // Not acting as a client
                 StunPacketImpl reply = new StunPacketImpl(MessageClass.ERROR, MessageMethod.BINDING, packet.getTransactionId());
-                reply.getAttributes().add(new ErrorCodeAttribute(400, "Unknown method invoked"));
+                reply.getAttributes().add(AttributeFactory.createErrorCodeAttribute(400, "Unknown method invoked"));
                 reply.getAttributes().add(mySoftwareAttribute);
                 reply.getAttributes().add(AttributeFactory.createFingerprintAttribute());
 
@@ -123,7 +123,7 @@ public class DefaultStunServerHandler extends BaseFilter {
 
         if (reply != null) {
             if (unknownAttributes.size() > 0) {
-                reply.getAttributes().add(new UnknownAttributesAttribute(unknownAttributes));
+                reply.getAttributes().add(AttributeFactory.createUnknownAttributesAttribute(unknownAttributes));
             }
             reply.getAttributes().add(mySoftwareAttribute);
             reply.getAttributes().add(AttributeFactory.createFingerprintAttribute());

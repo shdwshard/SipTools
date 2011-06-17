@@ -20,6 +20,7 @@
 package net.mc_cubed.icedjava.packet.header;
 
 /**
+ * MessageMethod represents a specific type of STUN message.
  *
  * @author Charles Chappell
  * @since 0.9

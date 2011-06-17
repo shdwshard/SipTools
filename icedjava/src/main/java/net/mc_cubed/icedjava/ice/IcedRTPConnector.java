@@ -38,6 +38,7 @@ import javax.sdp.Media;
 import net.mc_cubed.icedjava.ice.event.BytesAvailableEvent;
 import net.mc_cubed.icedjava.ice.event.IceEvent;
 import net.mc_cubed.icedjava.ice.event.IceEventListener;
+
 /**
  * IcedRTPConnector implements a RTP Connector implementation that leverages the
  * IcedJava library to deliver RTP/RTCP media streams between potentially NATed
@@ -63,6 +64,25 @@ public class IcedRTPConnector extends IceDatagramSocket
         }
     }
 
+    @Override
+    protected void addPeer(IcePeer peer) {
+        super.addPeer(peer);
+        peer.getChannels(this).get(0).addEventListener(rtpSocket);
+        if (peer.getChannels(this).size() > 1) {
+            peer.getChannels(this).get(1).addEventListener(rtcpSocket);
+        }
+    }
+
+    @Override
+    protected void removePeer(IcePeer peer) {
+        super.removePeer(peer);
+        peer.getChannels(this).get(0).removeEventListener(rtpSocket);
+        if (peer.getChannels(this).size() > 1) {
+            peer.getChannels(this).get(1).removeEventListener(rtcpSocket);
+        }
+    }
+    
+    
     /* 
      * Closes the open streams associated with all remote endpoints that have been added previously by subsequent addTarget() calls.
      */
@@ -150,7 +170,7 @@ public class IcedRTPConnector extends IceDatagramSocket
                 ContentDescriptor contentDescriptor) {
             this.socket = IcedRTPConnector.this;
             this.contentDescriptor = contentDescriptor;
-            this.componentId = componentId;
+            this.componentId = componentId;            
         }
 
         /*********************************************
@@ -184,7 +204,7 @@ public class IcedRTPConnector extends IceDatagramSocket
                     inBuffer = packetQueue.poll();
                     // Copy the data
                     try {
-                        System.arraycopy(inBuffer.array(), inBuffer.arrayOffset(), outBuffer, offset, inBuffer.remaining());
+                        System.arraycopy(inBuffer.array(), inBuffer.arrayOffset() + inBuffer.position(), outBuffer, offset, inBuffer.remaining());
                     } catch (Exception ex) {
                         // Replace the packet in the queue if an exception occurs
                         ((LinkedList) packetQueue).addFirst(inBuffer);
@@ -292,15 +312,16 @@ public class IcedRTPConnector extends IceDatagramSocket
         @SuppressWarnings("CallToThreadDumpStack")
         public int write(byte[] buffer, int offset, int length) {
             ByteBuffer bb = ByteBuffer.wrap(buffer, offset, length);
-            try {
-                socket.send(bb, componentId);
-            } catch (Exception ex) {
-                ex.printStackTrace();
-                return -1;
+            for (IcePeer peer : socket.getPeers()) {
+                try {
+                    peer.getChannels(socket).get(componentId).write(bb);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    return -1;
+                }
             }
             return length;
         }
-
 
         /**
          * Gets the underlying socket of this stream
@@ -313,11 +334,11 @@ public class IcedRTPConnector extends IceDatagramSocket
 
         @Override
         public void iceEvent(IceEvent event) {
-            if (event instanceof BytesAvailableEvent) {                
+            if (event instanceof BytesAvailableEvent) {
                 try {
                     BytesAvailableEvent bytesEvent = (BytesAvailableEvent) event;
                     ByteBuffer buffer = ByteBuffer.allocate(MAX_PACKET_SIZE);
-                    bytesEvent.getSocketChannel().receive(buffer); 
+                    bytesEvent.getSocketChannel().read(buffer);
                     // Get object's monitor since we're changing it.
                     synchronized (packetQueue) {
                         // Add the packet to the queue

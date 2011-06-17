@@ -30,8 +30,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.util.HashSet;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.enterprise.event.Event;
@@ -56,7 +56,7 @@ public class DatagramDemultiplexerSocket extends DatagramStunSocket implements D
 
     boolean nonBlocking = false;
     private DatagramStunSocketBridge socket = null;
-    final protected Queue<AddressedByteBuffer> bufferQueue = new LinkedBlockingQueue<AddressedByteBuffer>();
+    final protected Queue<AddressedByteBuffer> bufferQueue = new ConcurrentLinkedQueue<AddressedByteBuffer>();
     final protected HashSet<StunEventListener> listeners = new HashSet<StunEventListener>();
     @Inject
     Event<StunEvent> eventBroadcaster;
@@ -83,6 +83,7 @@ public class DatagramDemultiplexerSocket extends DatagramStunSocket implements D
         }
     }
 
+    
     @Override
     public TransportType getTransportType() {
         return TransportType.UDP;

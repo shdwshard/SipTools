@@ -21,29 +21,33 @@ package net.mc_cubed.icedjava.stun;
 
 import java.io.IOException;
 import java.net.SocketAddress;
+import java.text.MessageFormat;
+import java.util.ResourceBundle;
 import net.mc_cubed.icedjava.packet.StunPacket;
 
 /**
- *
+ * An exception indicating that the STUN packet attempting to be sent is too big
+ * and is exceedingly likely to be silently killed along the route.
+ * 
  * @author Charles Chappell
  * @since 1.0
  */
 class OversizeStunPacketException extends IOException {
 
+    String message;
+    
     public OversizeStunPacketException(SocketAddress remoteSocket, StunPacket packet) {
-        // TODO: Implement this in a sane manner.
+        this.message = MessageFormat.format(ResourceBundle.getBundle("net.mc_cubed.icedjava.Messages").getString("OversizeStunPacketMessage"),remoteSocket,packet);
     }
 
     @Override
     public String getLocalizedMessage() {
-        // TODO: Implement this in a sane manner.
-        return super.getLocalizedMessage();
+        return message;
     }
 
     @Override
     public String getMessage() {
-        // TODO: Implement this in a sane manner.
-        return super.getMessage();
+        return message;
     }
 
 

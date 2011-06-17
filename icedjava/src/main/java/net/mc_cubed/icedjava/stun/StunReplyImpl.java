@@ -24,7 +24,7 @@ import net.mc_cubed.icedjava.packet.attribute.Attribute;
 import net.mc_cubed.icedjava.packet.attribute.AttributeType;
 import net.mc_cubed.icedjava.packet.attribute.ErrorCodeAttribute;
 import net.mc_cubed.icedjava.packet.attribute.FingerprintAttribute;
-import net.mc_cubed.icedjava.packet.attribute.MappedAddressAttributeImpl;
+import net.mc_cubed.icedjava.packet.attribute.MappedAddressAttribute;
 import net.mc_cubed.icedjava.packet.attribute.SoftwareAttribute;
 import net.mc_cubed.icedjava.packet.attribute.XORMappedAddressAttribute;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
@@ -34,8 +34,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
+ * A POJO representation of a STUN reply.  Encapsulates a STUN Packet
  *
  * @author Charles Chappell
+ * @since 0.9
  */
 class StunReplyImpl implements StunReply {
 
@@ -53,7 +55,7 @@ class StunReplyImpl implements StunReply {
         for (Attribute attr : packet.getAttributes()) {
             attrMap.put(attr.getType(), attr);
             if (attr.getType() == AttributeType.MAPPED_ADDRESS) {
-                MappedAddressAttributeImpl maa = (MappedAddressAttributeImpl) attr;
+                MappedAddressAttribute maa = (MappedAddressAttribute) attr;
                 mappedAddress = new InetSocketAddress(maa.getAddress(), maa.getPort());
             }
             if (attr.getType() == AttributeType.XOR_MAPPED_ADDRESS) {

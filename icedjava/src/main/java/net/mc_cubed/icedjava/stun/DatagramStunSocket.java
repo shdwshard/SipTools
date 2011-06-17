@@ -45,8 +45,11 @@ import org.glassfish.grizzly.filterchain.FilterChainContext;
 import org.glassfish.grizzly.filterchain.NextAction;
 
 /**
+ * The basic class implementing STUN socket tests.  Automatically retries
+ * according to the cool down intervals specified in RFC 5389.
  *
  * @author Charles Chappell
+ * @since 0.9
  */
 public class DatagramStunSocket extends BaseFilter implements StunSocket, StunPacketSender {
 
@@ -151,8 +154,12 @@ public class DatagramStunSocket extends BaseFilter implements StunSocket, StunPa
                     Logger.getLogger(DatagramStunSocket.class.getName()).log(Level.SEVERE, null, ex);
                     replyFuture.setReply(new StunReplyImpl(ex));
                 } finally {
-                    if (!replyFuture.isDone()) {
-                        replyFuture.cancel(true);
+                    try {
+                        if (!replyFuture.isDone()) {
+                            replyFuture.cancel(true);
+                        }
+                    } catch (Throwable t) {
+                        // Do nothing, probably the JVM is shutting down
                     }
                 }
             }
@@ -190,7 +197,7 @@ public class DatagramStunSocket extends BaseFilter implements StunSocket, StunPa
         if (ctx.getMessage() instanceof StunPacket) {
             storeAndNotify((StunPacket) ctx.getMessage());
         } else {
-            log.log(Level.INFO, "Received a non-STUN packet on a STUN only socket.  Dropping {0} packet from: {1}", new Object[] {ctx.getMessage().getClass().getName(),ctx.getAddress()});
+            log.log(Level.INFO, "Received a non-STUN packet on a STUN only socket.  Dropping {0} packet from: {1}", new Object[]{ctx.getMessage().getClass().getName(), ctx.getAddress()});
         }
 
         return ctx.getStopAction();
