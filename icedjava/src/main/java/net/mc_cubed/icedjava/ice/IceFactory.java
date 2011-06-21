@@ -40,7 +40,7 @@ public class IceFactory {
      *
      * @return An uninitialized IceSocket object
      */
-    public IceSocket createIceSocket(Media media)
+    public static IceSocket createIceSocket(Media media)
             throws SdpParseException, SocketException {
         if (media.getProtocol().startsWith("UDP")
                 || media.getProtocol().startsWith("RTP")
@@ -51,11 +51,16 @@ public class IceFactory {
         }
     }
 
-    public IcePeer createIcePeer() throws SdpException {
+    public static IcePeer createIcePeer() throws SdpException {
         return new IcePeerImpl();
     }
 
-    public IcePeer createIcePeer(IceSocket... sockets) throws SdpException {
+    public static IcePeer createIcePeer(IceSocket... sockets) throws SdpException {
         return new IcePeerImpl(sockets);
     }
+
+    private IceFactory() {
+    }
+    
+    
 }

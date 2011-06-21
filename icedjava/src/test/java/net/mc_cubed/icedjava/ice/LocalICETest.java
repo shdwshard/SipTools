@@ -82,11 +82,10 @@ public class LocalICETest extends TestCase {
             SdpFactory factory = SdpFactory.getInstance();
             medias[0] = factory.createMediaDescription("video", 0, 2, "RTP/AVP", new String[]{"26"});
             medias[1] = factory.createMediaDescription("audio", 0, 2, "RTP/AVP", new String[]{"8"});
-            IceFactory iceFactory = new IceFactory();
-            final IceSocket[] localSockets = new IceSocket[]{iceFactory.createIceSocket(medias[0].getMedia()),
-                iceFactory.createIceSocket(medias[1].getMedia())};
-            final IceSocket[] remoteSockets = new IceSocket[]{iceFactory.createIceSocket(medias[0].getMedia()),
-                iceFactory.createIceSocket(medias[1].getMedia())};
+            final IceSocket[] localSockets = new IceSocket[]{IceFactory.createIceSocket(medias[0].getMedia()),
+                IceFactory.createIceSocket(medias[1].getMedia())};
+            final IceSocket[] remoteSockets = new IceSocket[]{IceFactory.createIceSocket(medias[0].getMedia()),
+                IceFactory.createIceSocket(medias[1].getMedia())};
 
             // Create a local peer for a yet unspecified remote peer
             localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
@@ -230,11 +229,10 @@ public class LocalICETest extends TestCase {
             SdpFactory factory = SdpFactory.getInstance();
             medias[0] = factory.createMediaDescription("video", 0, 2, "RTP/AVP", new String[]{"26"});
             medias[1] = factory.createMediaDescription("audio", 0, 2, "RTP/AVP", new String[]{"8"});
-            IceFactory iceFactory = new IceFactory();
-            final IceSocket[] localSockets = new IceSocket[]{iceFactory.createIceSocket(medias[0].getMedia()),
-                iceFactory.createIceSocket(medias[1].getMedia())};
-            final IceSocket[] remoteSockets = new IceSocket[]{iceFactory.createIceSocket(medias[0].getMedia()),
-                iceFactory.createIceSocket(medias[1].getMedia())};
+            final IceSocket[] localSockets = new IceSocket[]{IceFactory.createIceSocket(medias[0].getMedia()),
+                IceFactory.createIceSocket(medias[1].getMedia())};
+            final IceSocket[] remoteSockets = new IceSocket[]{IceFactory.createIceSocket(medias[0].getMedia()),
+                IceFactory.createIceSocket(medias[1].getMedia())};
 
             // Create a local peer for a yet unspecified remote peer
             localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
@@ -381,11 +379,10 @@ public class LocalICETest extends TestCase {
             SdpFactory factory = SdpFactory.getInstance();
             medias[0] = factory.createMediaDescription("video", 0, 2, "RTP/AVP", new String[]{"26"});
             medias[1] = factory.createMediaDescription("audio", 0, 2, "RTP/AVP", new String[]{"8"});
-            IceFactory iceFactory = new IceFactory();
-            final IceSocket[] localSockets = new IceSocket[]{iceFactory.createIceSocket(medias[0].getMedia()),
-                iceFactory.createIceSocket(medias[1].getMedia())};
-            final IceSocket[] remoteSockets = new IceSocket[]{iceFactory.createIceSocket(medias[0].getMedia()),
-                iceFactory.createIceSocket(medias[1].getMedia())};
+            final IceSocket[] localSockets = new IceSocket[]{IceFactory.createIceSocket(medias[0].getMedia()),
+                IceFactory.createIceSocket(medias[1].getMedia())};
+            final IceSocket[] remoteSockets = new IceSocket[]{IceFactory.createIceSocket(medias[0].getMedia()),
+                IceFactory.createIceSocket(medias[1].getMedia())};
 
             // Create a local peer for a yet unspecified remote peer
             localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
@@ -531,11 +528,10 @@ public class LocalICETest extends TestCase {
             SdpFactory factory = SdpFactory.getInstance();
             medias[0] = factory.createMediaDescription("video", 0, 2, "RTP/AVP", new String[]{"26"});
             medias[1] = factory.createMediaDescription("audio", 0, 2, "RTP/AVP", new String[]{"8"});
-            IceFactory iceFactory = new IceFactory();
-            final IceSocket[] localSockets = new IceSocket[]{iceFactory.createIceSocket(medias[0].getMedia()),
-                iceFactory.createIceSocket(medias[1].getMedia())};
-            final IceSocket[] remoteSockets = new IceSocket[]{iceFactory.createIceSocket(medias[0].getMedia()),
-                iceFactory.createIceSocket(medias[1].getMedia())};
+            final IceSocket[] localSockets = new IceSocket[]{IceFactory.createIceSocket(medias[0].getMedia()),
+                IceFactory.createIceSocket(medias[1].getMedia())};
+            final IceSocket[] remoteSockets = new IceSocket[]{IceFactory.createIceSocket(medias[0].getMedia()),
+                IceFactory.createIceSocket(medias[1].getMedia())};
 
             // Create a local peer for a yet unspecified remote peer
             localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);

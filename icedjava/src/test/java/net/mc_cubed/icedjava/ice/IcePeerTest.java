@@ -63,10 +63,9 @@ public class IcePeerTest extends TestCase {
     public void testCollectCandidates() throws SocketException, SdpException {
         System.out.println("collectCandidates");
         SdpFactory factory = SdpFactory.getInstance();
-        IceFactory iceFactory = new IceFactory();
         IceSocket[] iceSockets = new IceSocket[]{
-            iceFactory.createIceSocket(factory.createMediaDescription("video", 0, 2, "RTP/AVP", new String[]{"26"}).getMedia()),
-            iceFactory.createIceSocket(factory.createMediaDescription("audio", 0, 2, "RTP/AVP", new String[]{"8"}).getMedia())};
+            IceFactory.createIceSocket(factory.createMediaDescription("video", 0, 2, "RTP/AVP", new String[]{"26"}).getMedia()),
+            IceFactory.createIceSocket(factory.createMediaDescription("audio", 0, 2, "RTP/AVP", new String[]{"8"}).getMedia())};
         IcePeerImpl instance = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, null, null, iceSockets);
         List<LocalCandidate> candidates = new LinkedList<LocalCandidate>();
         for (IceSocket socket : instance.getIceSockets()) {
@@ -90,10 +89,9 @@ public class IcePeerTest extends TestCase {
     public void testMarkupCandidates() throws SdpException, SdpParseException, UnknownHostException, SocketException {
         System.out.println("collectCandidates");
         SdpFactory factory = SdpFactory.getInstance();
-        IceFactory iceFactory = new IceFactory();
         IceSocket[] iceSockets = new IceSocket[]{
-            iceFactory.createIceSocket(factory.createMediaDescription("video", 0, 2, "RTP/AVP", new String[]{"26"}).getMedia()),
-            iceFactory.createIceSocket(factory.createMediaDescription("audio", 0, 2, "RTP/AVP", new String[]{"8"}).getMedia())};
+            IceFactory.createIceSocket(factory.createMediaDescription("video", 0, 2, "RTP/AVP", new String[]{"26"}).getMedia()),
+            IceFactory.createIceSocket(factory.createMediaDescription("audio", 0, 2, "RTP/AVP", new String[]{"8"}).getMedia())};
         IcePeerImpl instance = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, null, null, iceSockets);
         SessionDescription session = instance.createOffer();
         System.out.println(session);
