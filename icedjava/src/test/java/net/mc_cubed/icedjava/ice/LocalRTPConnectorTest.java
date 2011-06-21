@@ -198,8 +198,8 @@ public class LocalRTPConnectorTest extends TestCase {
             Thread.sleep(100);
         }
 
-        Assert.assertEquals("ICE processing failed to finish in under 60 seconds",IceStatus.SUCCESS,localPeer.getStatus());
-        Assert.assertEquals("ICE processing failed to finish in under 60 seconds",IceStatus.SUCCESS,remotePeer.getStatus());
+        Assert.assertEquals("ICE processing failed to complete successfully in under 60 seconds",IceStatus.SUCCESS,localPeer.getStatus());
+        Assert.assertEquals("ICE processing failed to complete successfully in under 60 seconds",IceStatus.SUCCESS,remotePeer.getStatus());
 
         // Get the nominated connection
         Assert.assertNotNull(localPeer.getNominated());

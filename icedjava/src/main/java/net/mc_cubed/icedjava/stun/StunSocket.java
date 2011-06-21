@@ -10,6 +10,6 @@ package net.mc_cubed.icedjava.stun;
  * @author Charles Chappell
  * @since 1.0
  */
-public interface StunSocket extends StunPacketSender, StunSocketChannel,DemultiplexerSocket {
+public interface StunSocket extends StunPacketSender, StunSocketChannel {
     
 }

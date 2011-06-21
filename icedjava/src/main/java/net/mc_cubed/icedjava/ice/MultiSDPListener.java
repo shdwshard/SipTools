@@ -26,7 +26,6 @@ import javax.sdp.Attribute;
 import javax.sdp.Connection;
 import javax.sdp.MediaDescription;
 import javax.sdp.SdpParseException;
-import javax.sdp.SessionDescription;
 
 /**
  * MultiSDPListener is an interface for objects listening for SDP announcements
@@ -36,9 +35,6 @@ import javax.sdp.SessionDescription;
  * @since 0.9
  */
 public interface MultiSDPListener {
-
-    @Deprecated
-    public void sendSession(SessionDescription session, IcePeer fromPeer);
 
     public void updateMedia(Connection conn,Vector iceAttributes, Vector iceMedias, IcePeer fromPeer)
             throws SdpParseException;

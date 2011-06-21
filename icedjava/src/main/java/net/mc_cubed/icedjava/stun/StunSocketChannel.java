@@ -20,11 +20,15 @@
 package net.mc_cubed.icedjava.stun;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
+import java.util.concurrent.Future;
+import net.mc_cubed.icedjava.packet.StunPacket;
 
 /**
  * Represents an StunSocketChannel which is used to send and receive data from
@@ -38,4 +42,25 @@ public interface StunSocketChannel extends ByteChannel, ScatteringByteChannel, G
     SocketAddress receive(ByteBuffer dst);
 
     int send(ByteBuffer src, SocketAddress target) throws IOException;
+    /**
+     * Returns the transport type of the socket
+     * @return TCP if stream based, UDP if datagram based
+     */
+    public TransportType getTransportType();
+    /**
+     * Get the local address of this socket
+     * @return the local address of the socket
+     */
+    public InetAddress getLocalAddress();
+    /**
+     * Get the local port of this socket
+     * @return the local port of the socket
+     */
+    public int getLocalPort();
+    /**
+     * Get the local socket address
+     * @return the local socket address
+     */
+    public InetSocketAddress getLocalSocketAddress();
+    
 }

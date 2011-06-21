@@ -20,8 +20,12 @@
 package net.mc_cubed.icedjava.packet.attribute;
 
 /**
+ * NullAttribute is a special case for attributes which are unintelligible to
+ * IcedJava. The raw attribute type and bytes are available, but otherwise
+ * IcedJava makes no attempt to parse this attribute's information.
  *
  * @author Charles Chappell
+ * @since 0.9
  */
 public class NullAttribute extends GenericAttribute {
 

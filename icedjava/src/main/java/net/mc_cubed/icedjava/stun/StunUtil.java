@@ -197,7 +197,7 @@ public class StunUtil {
         return getStunSocket(new InetSocketAddress(address, port), stunType);
     }
 
-    public static DatagramDemultiplexerSocket getCustomStunPipeline(InetSocketAddress address, final Filter stunFilter) throws IOException {
+    public static DemultiplexerSocket getCustomStunPipeline(InetSocketAddress address, final Filter stunFilter) throws IOException {
         // Create a FilterChain using FilterChainBuilder
         FilterChainBuilder filterChainBuilder = FilterChainBuilder.stateless();
 
@@ -234,31 +234,31 @@ public class StunUtil {
         return socket;
     }
 
-    public static DatagramDemultiplexerSocket getCustomStunPipeline(int port, final Filter stunFilter) throws IOException {
+    public static DemultiplexerSocket getCustomStunPipeline(int port, final Filter stunFilter) throws IOException {
         return getCustomStunPipeline(new InetSocketAddress(port), stunFilter);
     }
 
-    public static DatagramDemultiplexerSocket getCustomStunPipeline(InetAddress address, int port, final Filter stunFilter) throws IOException {
+    public static DemultiplexerSocket getCustomStunPipeline(InetAddress address, int port, final Filter stunFilter) throws IOException {
         return getCustomStunPipeline(new InetSocketAddress(address, port), stunFilter);
     }
 
-    public static DatagramDemultiplexerSocket getCustomStunPipeline(final Filter stunFilter) throws IOException {
+    public static DemultiplexerSocket getCustomStunPipeline(final Filter stunFilter) throws IOException {
         return getCustomStunPipeline(new InetSocketAddress(0), stunFilter);
     }
 
-    public static DatagramDemultiplexerSocket getDemultiplexerSocket(InetAddress address, int port) throws IOException {
+    public static DemultiplexerSocket getDemultiplexerSocket(InetAddress address, int port) throws IOException {
         return getDemultiplexerSocket(new InetSocketAddress(address, port), null);
     }
 
-    public static DatagramDemultiplexerSocket getDemultiplexerSocket(int port) throws IOException {
+    public static DemultiplexerSocket getDemultiplexerSocket(int port) throws IOException {
         return getDemultiplexerSocket(new InetSocketAddress(port), null);
     }
 
-    public static DatagramDemultiplexerSocket getDemultiplexerSocket() throws IOException {
+    public static DemultiplexerSocket getDemultiplexerSocket() throws IOException {
         return getDemultiplexerSocket((InetSocketAddress) null, null);
     }
 
-    public static DatagramDemultiplexerSocket getDemultiplexerSocket(InetSocketAddress inetSocketAddress, final StunEventListener stunEventListener) throws IOException {
+    public static DemultiplexerSocket getDemultiplexerSocket(InetSocketAddress inetSocketAddress, final StunEventListener stunEventListener) throws IOException {
         // Create a FilterChain using FilterChainBuilder
         FilterChainBuilder filterChainBuilder = FilterChainBuilder.stateless();
 

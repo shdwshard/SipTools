@@ -26,6 +26,7 @@ import net.mc_cubed.icedjava.stun.StunReply;
  *
  * @author Charles Chappell
  * @since 0.9
+ * @see StunReply
  */
 public interface IceReply extends StunReply {
 

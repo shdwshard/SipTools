@@ -22,8 +22,13 @@ package net.mc_cubed.icedjava.packet.attribute;
 import net.mc_cubed.icedjava.util.NumericUtils;
 
 /**
+ * A value holder class for STUN attributes which contain a single long (64-bit)
+ * value
  *
  * @author Charles Chappell
+ * @since 0.9
+ * @see IceControlledAttribute
+ * @see IceControllingAttribute
  */
 class LongAttribute extends GenericAttribute implements IceControlledAttribute, 
         IceControllingAttribute {

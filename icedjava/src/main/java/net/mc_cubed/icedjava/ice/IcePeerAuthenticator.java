@@ -31,7 +31,6 @@ import java.util.logging.Logger;
  * @since 0.9
  * @see StunAuthenticator
  * @see IcePeer
- * @see net.mc_cubed.icedjava.stun.GenericStunListener
  */
 public class IcePeerAuthenticator implements StunAuthenticator {
 

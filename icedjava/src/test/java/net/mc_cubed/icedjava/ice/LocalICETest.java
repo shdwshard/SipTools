@@ -34,7 +34,7 @@ import javax.swing.SwingUtilities;
 import junit.framework.Assert;
 import junit.framework.TestCase;
 import net.mc_cubed.icedjava.ice.IceStateMachine.AgentRole;
-import net.mc_cubed.icedjava.ice.event.BytesAvailableEvent;
+import net.mc_cubed.icedjava.ice.event.IceBytesAvailableEvent;
 import net.mc_cubed.icedjava.ice.event.IceEvent;
 import net.mc_cubed.icedjava.ice.event.IceEventListener;
 import net.mc_cubed.icedjava.stun.StunUtil;
@@ -161,9 +161,9 @@ public class LocalICETest extends TestCase {
 
                 @Override
                 public void iceEvent(IceEvent event) {
-                    if (event instanceof BytesAvailableEvent) {
+                    if (event instanceof IceBytesAvailableEvent) {
                         try {
-                            BytesAvailableEvent bytesEvent = (BytesAvailableEvent) event;
+                            IceBytesAvailableEvent bytesEvent = (IceBytesAvailableEvent) event;
                             ByteBuffer buffer = ByteBuffer.allocate(StunUtil.MAX_PACKET_SIZE);
                             bytesEvent.getSocketChannel().read(buffer);
                             System.out.println("Received Datagram: " + buffer);
@@ -312,9 +312,9 @@ public class LocalICETest extends TestCase {
 
                 @Override
                 public void iceEvent(IceEvent event) {
-                    if (event instanceof BytesAvailableEvent) {
+                    if (event instanceof IceBytesAvailableEvent) {
                         try {
-                            BytesAvailableEvent bytesEvent = (BytesAvailableEvent) event;
+                            IceBytesAvailableEvent bytesEvent = (IceBytesAvailableEvent) event;
                             ByteBuffer buffer = ByteBuffer.allocate(StunUtil.MAX_PACKET_SIZE);
                             bytesEvent.getSocketChannel().read(buffer);
                             System.out.println("Received Datagram: " + buffer);
@@ -461,9 +461,9 @@ public class LocalICETest extends TestCase {
 
                 @Override
                 public void iceEvent(IceEvent event) {
-                    if (event instanceof BytesAvailableEvent) {
+                    if (event instanceof IceBytesAvailableEvent) {
                         try {
-                            BytesAvailableEvent bytesEvent = (BytesAvailableEvent) event;
+                            IceBytesAvailableEvent bytesEvent = (IceBytesAvailableEvent) event;
                             ByteBuffer buffer = ByteBuffer.allocate(StunUtil.MAX_PACKET_SIZE);
                             bytesEvent.getSocketChannel().read(buffer);
                             System.out.println("Received Datagram: " + buffer);
@@ -615,9 +615,9 @@ public class LocalICETest extends TestCase {
 
                 @Override
                 public void iceEvent(IceEvent event) {
-                    if (event instanceof BytesAvailableEvent) {
+                    if (event instanceof IceBytesAvailableEvent) {
                         try {
-                            BytesAvailableEvent bytesEvent = (BytesAvailableEvent) event;
+                            IceBytesAvailableEvent bytesEvent = (IceBytesAvailableEvent) event;
                             ByteBuffer buffer = ByteBuffer.allocate(StunUtil.MAX_PACKET_SIZE);
                             bytesEvent.getSocketChannel().read(buffer);
                             System.out.println("Received Datagram: " + buffer);

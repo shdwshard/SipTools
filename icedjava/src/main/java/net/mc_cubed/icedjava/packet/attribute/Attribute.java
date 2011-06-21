@@ -27,11 +27,35 @@ package net.mc_cubed.icedjava.packet.attribute;
  */
 public interface Attribute {
 
+    /**
+     * Get the length of the attribute in bytes
+     * 
+     * @return the length of the attriute
+     */
     int getLength();
 
+    /**
+     * Get the type of the attribute
+     * 
+     * @return an AttributeType enum representing the STUN attribute type
+     * @see AttributeType
+     */
     AttributeType getType();
 
+    /**
+     * Get the underlying byte data of this attribute.
+     * 
+     * @return raw byte data of this attribute
+     */
     byte[] getData();
 
+    /**
+     * Write this attribute's data into the supplied byte buffer starting at
+     * the supplied offset
+     * 
+     * @param data Target Byte Buffer
+     * @param off Offset to write attribute bytes to
+     * @return the number of bytes written (always the same as .getLength())
+     */
     int write(byte[] data, int off);
 }

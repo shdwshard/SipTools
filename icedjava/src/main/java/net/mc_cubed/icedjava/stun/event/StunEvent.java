@@ -19,14 +19,12 @@
  */
 package net.mc_cubed.icedjava.stun.event;
 
-import java.io.Serializable;
-
 /**
  * StunEvent is an abstract interface representing STUN events
  *
  * @author Charles Chappell
  * @since 1.0
  */
-public interface StunEvent extends Serializable {
+public interface StunEvent {
     
 }

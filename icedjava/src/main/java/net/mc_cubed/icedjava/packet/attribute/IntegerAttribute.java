@@ -22,8 +22,10 @@ package net.mc_cubed.icedjava.packet.attribute;
 import net.mc_cubed.icedjava.util.NumericUtils;
 
 /**
+ * IntegerAttribute is a base class for integer holding Attribute types
  *
  * @author Charles Chappell
+ * @see PriorityAttribute
  */
 class IntegerAttribute extends GenericAttribute implements PriorityAttribute {
 

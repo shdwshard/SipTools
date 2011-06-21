@@ -19,11 +19,8 @@
  */
 package net.mc_cubed.icedjava.stun;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.util.concurrent.Future;
-import net.mc_cubed.icedjava.packet.StunPacket;
+import java.net.DatagramSocket;
+import java.net.SocketException;
 import net.mc_cubed.icedjava.stun.event.StunEventListener;
 
 /**
@@ -33,47 +30,8 @@ import net.mc_cubed.icedjava.stun.event.StunEventListener;
  * @author Charles Chappell
  * @since 1.0
  */
-public interface DemultiplexerSocket extends StunSocketChannel {
-    /**
-     * Returns the transport type of the socket
-     * @return TCP if stream based, UDP if datagram based
-     */
-    public TransportType getTransportType();
-    /**
-     * Get the local address of this socket
-     * @return the local address of the socket
-     */
-    public InetAddress getLocalAddress();
-    /**
-     * Get the local port of this socket
-     * @return the local port of the socket
-     */
-    public int getLocalPort();
-    /**
-     * Get the local socket address
-     * @return the local socket address
-     */
-    public InetSocketAddress getLocalSocketAddress();
-    /**
-     * Performs a stun BINDING request to the specified server.
-     *
-     * @param stunServer STUN server to test
-     * @return a future which can be used to obtain the result of this STUN test
-     * @throws IOException
-     * @throws InterruptedException
-     */
-    public Future<StunReply> doTest(InetSocketAddress stunServer) throws IOException, InterruptedException;
-    /**
-     * Performs a stun BINDING request to the specified server.
-     *
-     * @param stunServer STUN server to test
-     * @param packet packet to use for this test
-     * @return a future which can be used to obtain the result of this STUN test
-     * @throws IOException
-     * @throws InterruptedException
-     */
-    public Future<StunReply> doTest(InetSocketAddress stunServer,StunPacket packet) throws IOException, InterruptedException;
-    
+public interface DemultiplexerSocket extends StunSocketChannel,StunPacketSender {
+
     /**
      * Register a stun event listener with this demultiplexer socket.
      * 
@@ -87,5 +45,14 @@ public interface DemultiplexerSocket extends StunSocketChannel {
      * @param listener listener to register
      */
     public void deregisterStunEventListener(StunEventListener listener);
+    
+    /**
+     * Get a java OIO DatagramSocket representing the non-stun data side of this
+     * DemultiplexerSocket
+     * 
+     * @return A DatagramSocket for non-stun data.
+     * @throws SocketException
+     */
+    public DatagramSocket getDatagramSocket() throws SocketException;
 
 }

@@ -29,9 +29,7 @@ import java.util.Collection;
 import java.util.LinkedList;
 import net.mc_cubed.icedjava.ice.AddressDiscovery;
 import net.mc_cubed.icedjava.ice.AddressDiscoveryMechanism;
-import net.mc_cubed.icedjava.ice.Candidate.CandidateType;
 import net.mc_cubed.icedjava.ice.LocalCandidate;
-import net.mc_cubed.icedjava.stun.TransportType;
 
 /**
  * Collects NAT assisted candidates from a PMP enabled gateway device
@@ -39,7 +37,7 @@ import net.mc_cubed.icedjava.stun.TransportType;
  * WARNING: This class is dead pending either an LGPL compliant source donation,
  * a new library that works, or me writing a new from-scratch PMP library class.
  * 
- * jNAT-PMPlib is too unstable.
+ * jNAT-PMPlib is entirely too unstable.
  * 
  * @author Charles Chappell
  * @since 1.0

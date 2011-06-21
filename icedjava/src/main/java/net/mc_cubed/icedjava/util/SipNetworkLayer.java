@@ -40,7 +40,7 @@ import net.mc_cubed.icedjava.stun.StunUtil;
  * @author Charles Chappell
  * @since 1.0
  */
-public class SipNetworkLayer implements gov.nist.core.net.NetworkLayer {
+class SipNetworkLayer implements gov.nist.core.net.NetworkLayer {
 
     StunUtil stunUtil = new StunUtil();
 

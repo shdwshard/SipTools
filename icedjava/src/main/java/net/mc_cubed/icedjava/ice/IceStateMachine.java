@@ -74,8 +74,8 @@ import net.mc_cubed.icedjava.packet.attribute.RealmAttribute;
 import net.mc_cubed.icedjava.packet.attribute.UsernameAttribute;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
+import net.mc_cubed.icedjava.stun.DemultiplexerSocket;
 import net.mc_cubed.icedjava.stun.StunReply;
-import net.mc_cubed.icedjava.stun.StunSocket;
 import net.mc_cubed.icedjava.stun.StunUtil;
 import net.mc_cubed.icedjava.stun.TransportType;
 import net.mc_cubed.icedjava.util.ExpiringCache;
@@ -723,8 +723,10 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     /**
      * Stun/ICE packet processing
      *
-     * @param p The packet in question
-     * @param source The source channel, since one ICE channel may have many StunSockets
+     * @param packet The packet in question
+     * @param sourceAddress The source address, since one ICE channel may have 
+     * several DemultiplexerSockets
+     * @param ctx The filterChainContext associated with this request
      * @return Whether the packet was processed by STUN/ICE.
      */
     public boolean processPacket(StunPacket packet, SocketAddress sourceAddress, FilterChainContext ctx) throws IOException {
@@ -935,7 +937,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                                 && !address.isLinkLocalAddress()
                                 && !address.isAnyLocalAddress()
                                 && !address.isMulticastAddress()) {
-                            StunSocket socket = StunUtil.getCustomStunPipeline(new InetSocketAddress(address, 0), this);
+                            DemultiplexerSocket socket = StunUtil.getCustomStunPipeline(new InetSocketAddress(address, 0), this);
                             socket.setMaxRetries(4);
                             retval.add(new LocalCandidate(
                                     this,

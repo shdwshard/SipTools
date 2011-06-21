@@ -17,7 +17,6 @@
  * License along with IcedJava.  If not, see
  * <http://www.gnu.org/licenses/>.
  */
-
 package net.mc_cubed.icedjava.ice;
 
 import java.lang.annotation.ElementType;

@@ -30,20 +30,54 @@ import javax.sdp.SessionDescription;
 
 /**
  * An interface for objects listening for SDP updates from an ICE state machine
- * or IcePeer.
+ * or IcePeer.  All IceStateMachines (including IcePeers) also implement the
+ * SDPListener interface to listen for SDP updates.
  *
  * @author Charles Chappell
  * @since 0.9
  * @see IcePeer
  */
 public interface SDPListener {
+    /**
+     * Classes implementing the SDPListener interface can be sent an SDP update
+     * to use for ICE or other processing using this method
+     * 
+     * @param session Updated SessionDescription to use for processing
+     * @throws SdpException
+     * @deprecated Use updateMedia() instead
+     * @see .updateMedia
+     */
     @Deprecated
     public void sendSession(SessionDescription session)
             throws SdpException;
 
+    /**
+     * Classes implementing the SDPListener interface can be sent an SDP update
+     * to use for ICE or other processing using this method.  Not all parts of
+     * the SDP descriptor necessarily originate from an IcePeer, or are destined
+     * for an IcePeer, hence this method allows only the relevant information to
+     * be sent, and the receiving class to use only the relevant information
+     * 
+     * @param conn The C line of the SDP description
+     * @param iceAttributes global A lines used during ICE negociation
+     * @param iceMedias M lines used during ICE processing
+     * @throws SdpParseException 
+     */
     public void updateMedia(Connection conn,Vector iceAttributes, Vector iceMedias)
             throws SdpParseException;
 
+    /**
+     * Classes implementing the SDPListener interface can be sent an SDP update
+     * to use for ICE or other processing using this method.  Not all parts of
+     * the SDP descriptor necessarily originate from an IcePeer, or are destined
+     * for an IcePeer, hence this method allows only the relevant information to
+     * be sent, and the receiving class to use only the relevant information
+     * 
+     * @param conn The C line of the SDP description
+     * @param iceAttributes global A lines used during ICE negociation
+     * @param iceMedias M lines used during ICE processing
+     * @throws SdpParseException 
+     */
     public void updateMedia(Connection conn,List<Attribute> iceAttributes, List<MediaDescription> iceMedias)
             throws SdpParseException;
 

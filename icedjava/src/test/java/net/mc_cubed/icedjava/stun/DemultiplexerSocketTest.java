@@ -20,6 +20,7 @@
 package net.mc_cubed.icedjava.stun;
 
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import junit.framework.Assert;
 import junit.framework.TestCase;
 
@@ -45,11 +46,11 @@ public class DemultiplexerSocketTest extends TestCase {
 
     public void testSocket() throws Exception, Throwable {
         System.out.println("socket");
-        DatagramDemultiplexerSocket instance1 = StunUtil.getDemultiplexerSocket(1234);
-        DatagramDemultiplexerSocket instance2 = StunUtil.getDemultiplexerSocket(5678);
+        DemultiplexerSocket instance1 = StunUtil.getDemultiplexerSocket(1234);
+        DemultiplexerSocket instance2 = StunUtil.getDemultiplexerSocket(5678);
 
-        StunReply i1reply = instance1.doTest(InetAddress.getByName("127.0.0.1"), 5678).get();
-        StunReply i2reply = instance2.doTest(InetAddress.getByName("127.0.0.1"), 1234).get();
+        StunReply i1reply = instance1.doTest(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 5678)).get();
+        StunReply i2reply = instance2.doTest(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 1234)).get();
 
         instance1.close();
         instance2.close();
