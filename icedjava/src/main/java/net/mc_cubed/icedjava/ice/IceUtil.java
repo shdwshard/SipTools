@@ -28,12 +28,14 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.enterprise.inject.Produces;
 import javax.inject.Named;
 import net.mc_cubed.icedjava.ice.Candidate.CandidateType;
 import net.mc_cubed.icedjava.stun.StunSocketType;
 import net.mc_cubed.icedjava.stun.StunReply;
-import net.mc_cubed.icedjava.stun.DatagramStunSocket;
+import net.mc_cubed.icedjava.stun.StunSocket;
 import net.mc_cubed.icedjava.stun.StunUtil;
 import net.mc_cubed.icedjava.stun.annotation.StunServer;
 import net.mc_cubed.icedjava.util.ExpiringCache;
@@ -118,7 +120,7 @@ public class IceUtil {
                 Enumeration<InetAddress> addrs = iface.getInetAddresses();
                 while (addrs.hasMoreElements()) {
                     InetAddress addr = addrs.nextElement();
-                    DatagramStunSocket socket = null;
+                    StunSocket socket = null;
                     if (!addr.isLinkLocalAddress() && !addr.isLoopbackAddress() 
                             && !addr.isMulticastAddress()) {
                         try {
@@ -159,7 +161,7 @@ public class IceUtil {
 
             return ifaceList;
         } catch (Exception ex) {
-            ex.printStackTrace();
+            Logger.getLogger(IceUtil.class.getName()).log(Level.SEVERE,"Caught an exception during interface discovery",ex);
             return null;
         }
 

@@ -234,4 +234,12 @@ public class AttributeFactory {
     public static UnknownAttributesAttribute createUnknownAttributesAttribute(Collection<AttributeType> attrs) {
         return new UnknownAttributesAttributeImpl(attrs);
     }
+
+    /**
+     * There's never a need to instantiate this class directly since all of its
+     * methods are static.
+     */
+    private AttributeFactory() {
+
+    }  
 }

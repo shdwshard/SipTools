@@ -22,7 +22,7 @@ package net.mc_cubed.icedjava.ice;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import net.mc_cubed.icedjava.stun.StunSocket;
+import net.mc_cubed.icedjava.stun.DemultiplexerSocket;
 import net.mc_cubed.icedjava.stun.TransportType;
 
 /**
@@ -42,7 +42,7 @@ public class LocalCandidate extends Candidate {
 
 
     InetSocketAddress stunServer;
-    StunSocket socket;
+    DemultiplexerSocket socket;
     private final IcePeer owner;
     private final IceSocket iceSocket;
 
@@ -55,11 +55,11 @@ public class LocalCandidate extends Candidate {
         return String.valueOf(Math.abs(foundation.hashCode()));
     }
 
-    public LocalCandidate(IcePeer owner, IceSocket iceSocket, CandidateType type, StunSocket socket) {
+    public LocalCandidate(IcePeer owner, IceSocket iceSocket, CandidateType type, DemultiplexerSocket socket) {
         this(owner, iceSocket, type, socket, (short) 0);
     }
 
-    public LocalCandidate(IcePeer owner, IceSocket iceSocket, CandidateType type, StunSocket socket, short componentId) {
+    public LocalCandidate(IcePeer owner, IceSocket iceSocket, CandidateType type, DemultiplexerSocket socket, short componentId) {
         this.type = type;
         this.address = socket.getLocalAddress();
         this.port = socket.getLocalPort();

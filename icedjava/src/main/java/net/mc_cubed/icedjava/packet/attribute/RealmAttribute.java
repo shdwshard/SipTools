@@ -20,9 +20,16 @@
 package net.mc_cubed.icedjava.packet.attribute;
 
 /**
+ * The Realm Attribute is used in STUN authentication processing.
  *
  * @author Charles Chappell
+ * @since 0.9
  */
 public interface RealmAttribute extends Attribute {
+    /**
+     * Get the realm value to be used during Authentication processing.
+     * 
+     * @return The realm value
+     */
     public String getValue();
 }

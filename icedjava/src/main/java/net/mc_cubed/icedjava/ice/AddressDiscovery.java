@@ -33,6 +33,15 @@ import java.util.Collection;
  */
 public interface AddressDiscovery {
 
-    Collection<LocalCandidate> getCandidates(Collection<LocalCandidate> lcs);
+    /**
+     * Using the supplied local candidates as a base, implementing classes
+     * form additional LocalCandidates and return them to the caller.
+     * 
+     * @param baseCandidates Base Candidates to use when forming new Local
+     * Candidates to use during ICE processing.
+     * @return An updated list of LocalCandidates with new candidates formed
+     * by this Address Discovery Mechanism.
+     */
+    Collection<LocalCandidate> getCandidates(Collection<LocalCandidate> baseCandidates);
 
 }

@@ -20,8 +20,14 @@
 package net.mc_cubed.icedjava.packet.attribute;
 
 /**
+ * This class represents a generic String based Attribute type.
  *
  * @author Charles Chappell
+ * @since 0.9
+ * @see UsernameAttribute
+ * @see RealmAttribute
+ * @see SoftwareAttribute
+ * @see NonceAttribute
  */
 class StringAttribute extends GenericAttribute implements UsernameAttribute,
         RealmAttribute, SoftwareAttribute, NonceAttribute {

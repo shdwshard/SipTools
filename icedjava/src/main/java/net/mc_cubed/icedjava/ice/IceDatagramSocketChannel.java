@@ -155,8 +155,8 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
 
     @Override
     public void stunEvent(StunEvent event) {
-        if (event instanceof net.mc_cubed.icedjava.stun.event.BytesAvailableEvent) {
-            net.mc_cubed.icedjava.stun.event.BytesAvailableEvent bytesEvent = (net.mc_cubed.icedjava.stun.event.BytesAvailableEvent) event;
+        if (event instanceof net.mc_cubed.icedjava.stun.event.DemultiplexedBytesAvailableEvent) {
+            net.mc_cubed.icedjava.stun.event.DemultiplexedBytesAvailableEvent bytesEvent = (net.mc_cubed.icedjava.stun.event.DemultiplexedBytesAvailableEvent) event;
             ByteBuffer buffer = ByteBuffer.allocate(4096);
             SocketAddress address = bytesEvent.getChannel().receive(buffer);
             queue.add(buffer);

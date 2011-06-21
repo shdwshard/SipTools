@@ -35,7 +35,7 @@ import javax.media.protocol.PushSourceStream;
 import javax.media.rtp.OutputDataStream;
 import javax.media.rtp.RTPConnector;
 import javax.sdp.Media;
-import net.mc_cubed.icedjava.ice.event.BytesAvailableEvent;
+import net.mc_cubed.icedjava.ice.event.IceBytesAvailableEvent;
 import net.mc_cubed.icedjava.ice.event.IceEvent;
 import net.mc_cubed.icedjava.ice.event.IceEventListener;
 
@@ -334,9 +334,9 @@ public class IcedRTPConnector extends IceDatagramSocket
 
         @Override
         public void iceEvent(IceEvent event) {
-            if (event instanceof BytesAvailableEvent) {
+            if (event instanceof IceBytesAvailableEvent) {
                 try {
-                    BytesAvailableEvent bytesEvent = (BytesAvailableEvent) event;
+                    IceBytesAvailableEvent bytesEvent = (IceBytesAvailableEvent) event;
                     ByteBuffer buffer = ByteBuffer.allocate(MAX_PACKET_SIZE);
                     bytesEvent.getSocketChannel().read(buffer);
                     // Get object's monitor since we're changing it.

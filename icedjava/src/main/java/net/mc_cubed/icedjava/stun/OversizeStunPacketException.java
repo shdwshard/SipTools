@@ -32,7 +32,7 @@ import net.mc_cubed.icedjava.packet.StunPacket;
  * @author Charles Chappell
  * @since 1.0
  */
-class OversizeStunPacketException extends IOException {
+public class OversizeStunPacketException extends IOException {
 
     String message;
     

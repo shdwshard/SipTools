@@ -20,9 +20,18 @@
 package net.mc_cubed.icedjava.packet.attribute;
 
 /**
+ * A NonceAttribute is used during authentication processes to discourage replay
+ * attacks by adding a random or semi-random information to the authentication
+ * process. No meaning can or should be assigned to the nonce value.
  *
  * @author Charles Chappell
+ * @since 0.9
  */
 public interface NonceAttribute extends Attribute {
+    /**
+     * Get the value of the Nonce represented by this attribute
+     * 
+     * @return The Nonce value.
+     */
     public String getValue();
 }

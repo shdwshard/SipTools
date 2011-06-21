@@ -25,7 +25,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
-import net.mc_cubed.icedjava.stun.event.StunEventListener;
 import net.mc_cubed.icedjava.util.ExpiringCache;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -51,7 +50,7 @@ import org.glassfish.grizzly.filterchain.NextAction;
  * @author Charles Chappell
  * @since 0.9
  */
-public class DatagramStunSocket extends BaseFilter implements StunSocket, StunPacketSender {
+class DatagramStunSocket extends BaseFilter implements StunSocket {
 
     protected static Logger log = Logger.getLogger(DatagramStunSocket.class.getName());
     static ExpiringCache<BigInteger, StunReplyFuture> requestCache = new ExpiringCache<BigInteger, StunReplyFuture>();
@@ -283,16 +282,6 @@ public class DatagramStunSocket extends BaseFilter implements StunSocket, StunPa
     @Override
     public TransportType getTransportType() {
         return TransportType.UDP;
-    }
-
-    @Override
-    public void registerStunEventListener(StunEventListener listener) {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void deregisterStunEventListener(StunEventListener listener) {
-        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     class StunReplyFuture implements Future<StunReply> {

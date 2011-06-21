@@ -37,7 +37,7 @@ import java.util.logging.Logger;
 import javax.enterprise.event.Event;
 import javax.inject.Inject;
 import net.mc_cubed.icedjava.packet.StunPacket;
-import net.mc_cubed.icedjava.stun.event.BytesAvailableEvent;
+import net.mc_cubed.icedjava.stun.event.DemultiplexedBytesAvailableEvent;
 import net.mc_cubed.icedjava.stun.event.StunEvent;
 import net.mc_cubed.icedjava.stun.event.StunEventListener;
 import net.mc_cubed.icedjava.util.AddressedByteBuffer;
@@ -52,7 +52,7 @@ import org.glassfish.grizzly.filterchain.NextAction;
  * @author Charles Chappell
  * @since 0.9
  */
-public class DatagramDemultiplexerSocket extends DatagramStunSocket implements DemultiplexerSocket, StunSocketChannel {
+class DatagramDemultiplexerSocket extends DatagramStunSocket implements DemultiplexerSocket, StunSocketChannel {
 
     boolean nonBlocking = false;
     private DatagramStunSocketBridge socket = null;
@@ -89,6 +89,7 @@ public class DatagramDemultiplexerSocket extends DatagramStunSocket implements D
         return TransportType.UDP;
     }
 
+    @Override
     public DatagramSocket getDatagramSocket() throws SocketException {
         if (socket == null) {
             socket = new DatagramStunSocketBridge(this);
@@ -366,7 +367,7 @@ public class DatagramDemultiplexerSocket extends DatagramStunSocket implements D
         }
     }
 
-    private static class BytesAvailableEventImpl implements BytesAvailableEvent {
+    private static class BytesAvailableEventImpl implements DemultiplexedBytesAvailableEvent {
 
         private static final long serialVersionUID = 5561852445673815517L;
         private final StunSocketChannel thisChannel;

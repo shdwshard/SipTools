@@ -33,9 +33,42 @@ import net.mc_cubed.icedjava.packet.StunPacket;
  */
 public interface StunPacketSender {
 
+    /**
+     * Set the maximum number of STUN retries.  This can have performance
+     * implications as the backout schedule starts at 500ms, and doubles after
+     * each attempt. The default is also quite high, and so can take many 
+     * seconds to time out.
+     * 
+     * @param retries maximum number of retries to send STUN packets.
+     */
     void setMaxRetries(int retries);
-    
-    Future<StunReply> doTest(InetSocketAddress server, StunPacket request) throws InterruptedException, IOException;
 
+    /**
+     * Mostly used internally, and should NOT be called directly.
+     * This method is used to record a STUN reply to a sent packet.
+     * 
+     * @param packet Reply packet
+     */
     public void storeAndNotify(StunPacket packet);
+
+    /**
+     * Performs a stun BINDING request to the specified server.
+     *
+     * @param stunServer STUN server to test
+     * @return a future which can be used to obtain the result of this STUN test
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public Future<StunReply> doTest(InetSocketAddress stunServer) throws IOException, InterruptedException;
+
+    /**
+     * Performs a stun BINDING request to the specified server.
+     *
+     * @param stunServer STUN server to test
+     * @param packet packet to use for this test
+     * @return a future which can be used to obtain the result of this STUN test
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public Future<StunReply> doTest(InetSocketAddress stunServer, StunPacket packet) throws IOException, InterruptedException;
 }

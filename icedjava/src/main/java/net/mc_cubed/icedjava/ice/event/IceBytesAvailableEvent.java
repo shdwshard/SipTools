@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Charles Chappell.
+ * Copyright 2011 Charles Chappell.
  *
  * This file is part of IcedJava.
  *
@@ -17,22 +17,19 @@
  * License along with IcedJava.  If not, see
  * <http://www.gnu.org/licenses/>.
  */
-package net.mc_cubed.icedjava.ice;
+package net.mc_cubed.icedjava.ice.event;
 
-import java.net.DatagramPacket;
-import java.net.SocketAddress;
-import net.mc_cubed.icedjava.packet.StunPacket;
-import net.mc_cubed.icedjava.stun.DatagramStunSocket;
+import net.mc_cubed.icedjava.ice.IceSocketChannel;
 
 /**
+ * IceBytesAvailableEvent indicates that data has been received on a socket
+ * channel, and can be read immediately.
  *
  * @author Charles Chappell
- * @since 0.9
- * @deprecated StunListeners are being replaced by ChannelHandlers
+ * @since 1.0
  */
-public interface MultiStunListener {
-    @Deprecated
-    boolean processPacket(DatagramPacket packet, DatagramStunSocket source);
+public interface IceBytesAvailableEvent extends IceEvent {
 
-    boolean processPacket(StunPacket packet, SocketAddress senderAddress, DatagramStunSocket source);
+    IceSocketChannel getSocketChannel();
+    
 }

@@ -20,8 +20,11 @@
 package net.mc_cubed.icedjava.packet.attribute;
 
 /**
+ * Fingerprint Attributes are used for error checking, but also to differentiate
+ * STUN packets from non-STUN packets in a flow with a high degree of precision.
  *
  * @author Charles Chappell
+ * @since 0.9
  */
 public interface FingerprintAttribute extends Attribute {
     /*

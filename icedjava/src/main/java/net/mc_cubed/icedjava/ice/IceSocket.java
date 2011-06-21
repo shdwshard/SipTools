@@ -20,8 +20,6 @@
 package net.mc_cubed.icedjava.ice;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.nio.ByteBuffer;
 import java.util.Collection;
 import javax.sdp.Media;
 import javax.sdp.SdpException;

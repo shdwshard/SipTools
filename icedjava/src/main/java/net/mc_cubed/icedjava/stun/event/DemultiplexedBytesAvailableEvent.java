@@ -22,12 +22,12 @@ package net.mc_cubed.icedjava.stun.event;
 import net.mc_cubed.icedjava.stun.StunSocketChannel;
 
 /**
- * BytesAvailableEvent notifies listeners that bytes are available for reading
+ * DemultiplexedBytesAvailableEvent notifies listeners that bytes are available for reading
  * on a stun socket channel.
  * 
  * @author Charles Chappell
  * @since 1.0
  */
-public interface BytesAvailableEvent extends StunEvent {
+public interface DemultiplexedBytesAvailableEvent extends StunEvent {
     StunSocketChannel getChannel();
 }

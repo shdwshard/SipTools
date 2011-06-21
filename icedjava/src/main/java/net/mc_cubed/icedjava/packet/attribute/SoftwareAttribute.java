@@ -20,10 +20,18 @@
 package net.mc_cubed.icedjava.packet.attribute;
 
 /**
+ * The software attribute contains an arbitrary string which identifies the
+ * software sending this STUN packet.
  *
  * @author Charles Chappell
+ * @since 0.9
  */
 public interface SoftwareAttribute extends Attribute {
 
+    /**
+     * Get the value of the Software attribute
+     * 
+     * @return The value of the Software attribute
+     */
     public String getValue();
 }
