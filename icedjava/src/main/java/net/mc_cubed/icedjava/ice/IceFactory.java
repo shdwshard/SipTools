@@ -50,11 +50,24 @@ public class IceFactory {
             return new IceStreamSocket(media);
         }
     }
-
+    
+    /**
+     * Create an IcePeer not bound to any IceSockets
+     * 
+     * @return An initialized IcePeer without any sockets attached to it
+     * @throws SdpException 
+     */
     public static IcePeer createIcePeer() throws SdpException {
         return new IcePeerImpl();
     }
 
+    /**
+     * Create an IcePeer bound to the supplied sockets
+     * 
+     * @param sockets Sockets to bind the peer to
+     * @return An initialized IcePeer bound to the supplied sockets
+     * @throws SdpException 
+     */
     public static IcePeer createIcePeer(IceSocket... sockets) throws SdpException {
         return new IcePeerImpl(sockets);
     }

@@ -21,7 +21,7 @@ package net.mc_cubed.icedjava.stun;
 
 import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
-import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import junit.framework.TestCase;
 
 /**
@@ -30,8 +30,7 @@ import junit.framework.TestCase;
  */
 public class StunSocketTest extends TestCase {
 
-    private static String STUN_SERVER = StunUtil.getStunServer();
-    private static Integer STUN_PORT = StunUtil.STUN_PORT;
+    private static InetSocketAddress STUN_SERVER = StunUtil.getCachedStunServerSocket();
 
     public StunSocketTest(String testName) {
         super(testName);
@@ -63,7 +62,7 @@ public class StunSocketTest extends TestCase {
         // Internet based test
         //instance1.send(InetAddress.getByName(STUN_SERVER),STUN_PORT,packet);
 
-        StunReply s = instance1.doTest(InetAddress.getByName(STUN_SERVER), STUN_PORT).get();
+        StunReply s = instance1.doTest(STUN_SERVER).get();
 
         System.out.println(s);
 
