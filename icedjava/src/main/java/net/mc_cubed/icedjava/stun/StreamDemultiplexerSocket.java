@@ -22,8 +22,11 @@ package net.mc_cubed.icedjava.stun;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.ref.WeakReference;
+import java.math.BigInteger;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
@@ -33,14 +36,21 @@ import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Future;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.enterprise.event.Event;
 import javax.inject.Inject;
 import net.mc_cubed.icedjava.packet.StunPacket;
+import net.mc_cubed.icedjava.stun.DatagramStunSocket.StunReplyFuture;
 import net.mc_cubed.icedjava.stun.event.DemultiplexedBytesAvailableEvent;
 import net.mc_cubed.icedjava.stun.event.StunEvent;
 import net.mc_cubed.icedjava.stun.event.StunEventListener;
 import net.mc_cubed.icedjava.util.AddressedByteBuffer;
+import net.mc_cubed.icedjava.util.ExpiringCache;
+import org.glassfish.grizzly.Connection;
+import org.glassfish.grizzly.filterchain.BaseFilter;
+import org.glassfish.grizzly.filterchain.FilterChain;
 import org.glassfish.grizzly.filterchain.FilterChainContext;
 import org.glassfish.grizzly.filterchain.NextAction;
 
@@ -52,8 +62,12 @@ import org.glassfish.grizzly.filterchain.NextAction;
  * @author Charles Chappell
  * @since 0.9
  */
-class StreamDemultiplexerSocket extends DatagramStunSocket implements DemultiplexerSocket, StunSocketChannel {
+class StreamDemultiplexerSocket extends BaseFilter implements DemultiplexerSocket, StunSocketChannel {
 
+    protected static Logger log = Logger.getLogger(DatagramStunSocket.class.getName());
+    static ExpiringCache<BigInteger, StunReplyFuture> requestCache = new ExpiringCache<BigInteger, StunReplyFuture>();
+    protected volatile WeakReference<FilterChain> filterChain;
+    protected volatile WeakReference<Connection<SocketAddress>> connection;
     boolean nonBlocking = false;
     final protected Queue<AddressedByteBuffer> bufferQueue = new ConcurrentLinkedQueue<AddressedByteBuffer>();
     final protected HashSet<StunEventListener> listeners = new HashSet<StunEventListener>();
@@ -201,6 +215,50 @@ class StreamDemultiplexerSocket extends DatagramStunSocket implements Demultiple
         }
 
         return socketBridge;
+    }
+
+    @Override
+    public InetAddress getLocalAddress() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public int getLocalPort() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public InetSocketAddress getLocalSocketAddress() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void close() throws IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void setMaxRetries(int retries) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void storeAndNotify(StunPacket packet) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public Future<StunReply> doTest(InetSocketAddress stunServer) throws IOException, InterruptedException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public Future<StunReply> doTest(InetSocketAddress stunServer, StunPacket packet) throws IOException, InterruptedException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    void setServerConnection(Connection connection) {
+        this.connection = new WeakReference<Connection<SocketAddress>>(connection);
     }
 
     /**

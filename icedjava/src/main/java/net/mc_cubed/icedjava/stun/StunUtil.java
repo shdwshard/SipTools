@@ -222,11 +222,13 @@ public class StunUtil {
             filterChainBuilder.add(stunFilter);
         }
 
-        // Finally, add the stunSocket class to the top of the chain
-        DatagramDemultiplexerSocket socket = new DatagramDemultiplexerSocket(null);
-        filterChainBuilder.add(socket);
+        DemultiplexerSocket socket;
 
         if (transportType == transportType.UDP) {
+            // Finally, add the stunSocket class to the top of the chain
+            socket = new DatagramDemultiplexerSocket(null);
+            filterChainBuilder.add((Filter)socket);
+            
             // Get the underlying datagram transport
             UDPNIOTransport transport = getDatagramTransport();
 
@@ -237,8 +239,12 @@ public class StunUtil {
             connection.setProcessor(filterChainBuilder.build());
 
             // Set the server connection
-            socket.setServerConnection(connection);
+            ((DatagramStunSocket)socket).setServerConnection(connection);
         } else {
+            // Finally, add the stunSocket class to the top of the chain
+            socket = new StreamDemultiplexerSocket(null);
+            filterChainBuilder.add((Filter)socket);
+
             // Get the underlying stream transport
             TCPNIOTransport transport = getServerSocketChannelFactory();
 
@@ -249,7 +255,7 @@ public class StunUtil {
             connection.setProcessor(filterChainBuilder.build());
 
             // Set the server connection
-            socket.setServerConnection(connection);
+            ((StreamDemultiplexerSocket)socket).setServerConnection(connection);
 
         }
 
@@ -299,20 +305,43 @@ public class StunUtil {
         //  handler
         filterChainBuilder.add(new DefaultStunServerHandler());
 
-        // Finally, add the stunSocket class to the top of the chain
-        DatagramDemultiplexerSocket socket = new DatagramDemultiplexerSocket(null);
-        filterChainBuilder.add(socket);
+        DemultiplexerSocket socket;
 
-        // Get the underlying datagram transport
-        UDPNIOTransport transport = getDatagramTransport();
+        if (transportType == transportType.UDP) {
+            // Finally, add the stunSocket class to the top of the chain
+            socket = new DatagramDemultiplexerSocket(null);
+            filterChainBuilder.add((Filter)socket);
+            
+            // Get the underlying datagram transport
+            UDPNIOTransport transport = getDatagramTransport();
 
-        UDPNIOServerConnection connection = transport.bind(inetSocketAddress);
+            // Bing the socket to the supplied address
+            UDPNIOServerConnection connection = transport.bind(inetSocketAddress);
 
-        // Add the filter chain
-        connection.setProcessor(filterChainBuilder.build());
+            // Add the filter chain
+            connection.setProcessor(filterChainBuilder.build());
 
-        socket.setServerConnection(connection);
+            // Set the server connection
+            ((DatagramStunSocket)socket).setServerConnection(connection);
+        } else {
+            // Finally, add the stunSocket class to the top of the chain
+            socket = new StreamDemultiplexerSocket(null);
+            filterChainBuilder.add((Filter)socket);
 
+            // Get the underlying stream transport
+            TCPNIOTransport transport = getServerSocketChannelFactory();
+
+            // Bind the socket to the supplied address
+            TCPNIOServerConnection connection = transport.bind(inetSocketAddress);
+
+            // Add the filter chain
+            connection.setProcessor(filterChainBuilder.build());
+
+            // Set the server connection
+            ((StreamDemultiplexerSocket)socket).setServerConnection(connection);
+
+        }
+        
         return socket;
     }
 
