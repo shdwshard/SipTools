@@ -36,7 +36,7 @@ import org.glassfish.grizzly.filterchain.NextAction;
  * @author Charles Chappell
  * @since 1.0
  */
-class StunPacketProtocolFilter extends BaseFilter {
+public class StunPacketProtocolFilter extends BaseFilter {
 
     Logger log = Logger.getLogger(getClass().getName());
 

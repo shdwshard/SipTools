@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.Collection;
 import javax.sdp.Media;
 import javax.sdp.SdpException;
+import net.mc_cubed.icedjava.stun.TransportType;
 
 /**
  * Represents a generic IceSocket which Peers will be attached to.
@@ -31,8 +32,6 @@ import javax.sdp.SdpException;
  * @since 1.0
  */
 public interface IceSocket {
-
-    //public int getPort();
 
     /**
      * Gets the Media line this socket and all of its peers will be based
@@ -75,5 +74,7 @@ public interface IceSocket {
     public boolean isOpen();
     
     public void close() throws IOException;
+    
+    public TransportType getTransport();
 
 }

@@ -44,10 +44,30 @@ public class DemultiplexerSocketTest extends TestCase {
         super.tearDown();
     }
 
-    public void testSocket() throws Exception, Throwable {
+    public void testUDPSocket() throws Exception, Throwable {
         System.out.println("socket");
-        DemultiplexerSocket instance1 = StunUtil.getDemultiplexerSocket(1234);
-        DemultiplexerSocket instance2 = StunUtil.getDemultiplexerSocket(5678);
+        DemultiplexerSocket instance1 = StunUtil.getDemultiplexerSocket(1234,TransportType.UDP);
+        DemultiplexerSocket instance2 = StunUtil.getDemultiplexerSocket(5678,TransportType.UDP);
+
+        StunReply i1reply = instance1.doTest(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 5678)).get();
+        StunReply i2reply = instance2.doTest(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 1234)).get();
+
+        instance1.close();
+        instance2.close();
+
+        Assert.assertTrue("Got wrong reply: " + i1reply, i1reply.isSuccess());
+        Assert.assertTrue("Got wrong reply: " + i2reply, i2reply.isSuccess());
+        Assert.assertEquals("Got wrong reply: " + i1reply,i1reply.getMappedAddress().getAddress().getHostAddress(), "127.0.0.1");
+        Assert.assertEquals("Got wrong reply: " + i2reply,i2reply.getMappedAddress().getAddress().getHostAddress(), "127.0.0.1");
+        Assert.assertEquals("Got wrong reply: " + i1reply,i1reply.getMappedAddress().getPort(), 1234);
+        Assert.assertEquals("Got wrong reply: " + i2reply,i2reply.getMappedAddress().getPort(), 5678);
+
+    }
+
+    public void testTCPSocket() throws Exception, Throwable {
+        System.out.println("socket");
+        DemultiplexerSocket instance1 = StunUtil.getDemultiplexerSocket(1234,TransportType.TCP);
+        DemultiplexerSocket instance2 = StunUtil.getDemultiplexerSocket(5678,TransportType.TCP);
 
         StunReply i1reply = instance1.doTest(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 5678)).get();
         StunReply i2reply = instance2.doTest(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 1234)).get();

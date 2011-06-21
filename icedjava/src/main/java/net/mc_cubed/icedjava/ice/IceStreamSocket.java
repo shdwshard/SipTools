@@ -19,55 +19,112 @@
  */
 package net.mc_cubed.icedjava.ice;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.net.SocketException;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.logging.Logger;
 import javax.sdp.Media;
 import javax.sdp.SdpException;
+import javax.sdp.SdpParseException;
+import net.mc_cubed.icedjava.stun.StunUtil;
+import net.mc_cubed.icedjava.stun.TransportType;
+import net.mc_cubed.icedjava.util.ExpiringCache;
 
 /**
  * An initial implementation of ICE-TCP<br/><br/>
- * <strong>WARNING: ICE-TCP is a WORK IN PROGRESS</strong>
- *
+ * <strong>WARNING: ICE-TCP is a WORK IN PROGRESS</strong> and carries the
+ * following notice: <i>Internet-Drafts are draft documents valid for a maximum of
+ * six months and may be updated, replaced, or obsoleted by other documents at
+ * any time.  It is inappropriate to use Internet-Drafts as reference
+ * material or to cite them other than as "work in progress."</i>
+ * 
  * @author Charles Chappell
  * @since 1.0
  */
 class IceStreamSocket implements IceSocket {
+    
+    private final InetSocketAddress stunServer;
+    private Map<String, IcePeer> _peers = new HashMap<String, IcePeer>();
+    private final static Logger log =
+            Logger.getLogger(IceStreamSocket.class.getName());
+    private Short components;
+    protected Media media;
+    public static final String PROP_MEDIA = "media";
+    ExpiringCache<SocketAddress, IcePeer> socketCache = new ExpiringCache<SocketAddress, IcePeer>();
 
     protected IceStreamSocket(Media media) {
+        this(StunUtil.getCachedStunServerSocket(),media);
+        
+    }
+    protected IceStreamSocket(InetSocketAddress stunServer)
+            throws SocketException, IOException, InterruptedException {
+        this(stunServer, (short) 1);
+    }
+
+    protected IceStreamSocket(InetSocketAddress stunServer, short components)
+            throws SocketException {
+        this.components = components;
+        this.stunServer = stunServer;
+    }
+
+    protected IceStreamSocket(InetSocketAddress stunServer,Media media) {
+        try {
+            this.media = media;
+            this.components = (short)media.getPortCount();
+            this.stunServer = stunServer;
+        } catch (SdpParseException ex) {
+            throw new java.lang.IllegalArgumentException("Got an exception determining port count of the media",ex);
+        }
+        
     }
 
     @Override
     public Media getMedia() throws SdpException {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return media;
     }
 
     @Override
     public void setMedia(Media media) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        this.media = media;
     }
 
+    /**
+     * Close all the actual sockets attached to this ICE socket
+     */
     @Override
     public void close() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        for (IcePeer peer : getPeers()) {
+            peer.close();
+        }
     }
 
     @Override
     public Collection<IcePeer> getPeers() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return this._peers.values();
     }
 
     @Override
     public boolean isOpen() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return (!getPeers().isEmpty());
     }
 
     @Override
     public short getComponents() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return this.components;
     }
 
     @Override
     public boolean isClosed() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return !isOpen();
+    }
+
+    @Override
+    public TransportType getTransport() {
+        return TransportType.TCP;
     }
 
 }

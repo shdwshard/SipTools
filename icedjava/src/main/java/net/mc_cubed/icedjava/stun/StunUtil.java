@@ -26,6 +26,7 @@ import org.glassfish.grizzly.Transport.State;
 import org.glassfish.grizzly.filterchain.Filter;
 import org.glassfish.grizzly.filterchain.FilterChainBuilder;
 import org.glassfish.grizzly.filterchain.TransportFilter;
+import org.glassfish.grizzly.nio.transport.TCPNIOServerConnection;
 import org.glassfish.grizzly.nio.transport.TCPNIOTransport;
 import org.glassfish.grizzly.nio.transport.TCPNIOTransportBuilder;
 import org.glassfish.grizzly.nio.transport.UDPNIOServerConnection;
@@ -57,8 +58,8 @@ public class StunUtil {
         "stun.voxgratia.org",
         "stun.xten.com",
         "stun1.noc.ams-ix.net"
-        //"numb.viagenie.ca", // Getting timeouts with this server
-        //"stun.ipshka.com" // Getting timeouts with this server
+    //"numb.viagenie.ca", // Getting timeouts with this server
+    //"stun.ipshka.com" // Getting timeouts with this server
     };
     public static Integer STUN_PORT = 3478;
     // This really should be adjusted to match some established standard
@@ -82,7 +83,7 @@ public class StunUtil {
             servers.addAll(Arrays.asList(serverList));
 
             Collections.shuffle(servers);
-            DatagramStunSocket testSocket = getStunSocket(new InetSocketAddress(InetAddress.getByName("0.0.0.0"), 0), StunSocketType.CLIENT);
+            StunSocket testSocket = getStunSocket(new InetSocketAddress(InetAddress.getByName("0.0.0.0"), 0), StunSocketType.CLIENT);
 
             for (String server : servers) {
                 try {
@@ -122,7 +123,7 @@ public class StunUtil {
             servers.addAll(Arrays.asList(serverList));
 
             Collections.shuffle(servers);
-            DatagramStunSocket testSocket = getStunSocket(new InetSocketAddress(InetAddress.getByName("0.0.0.0"), 0), StunSocketType.CLIENT);
+            StunSocket testSocket = getStunSocket(new InetSocketAddress(InetAddress.getByName("0.0.0.0"), 0), StunSocketType.CLIENT);
 
             for (String server : servers) {
                 try {
@@ -146,7 +147,7 @@ public class StunUtil {
         return null;
     }
 
-    public static DatagramStunSocket getStunSocket(InetSocketAddress address, final StunSocketType stunType) throws IOException {
+    public static StunSocket getStunSocket(InetSocketAddress address, final StunSocketType stunType) throws IOException {
         // Create a FilterChain using FilterChainBuilder
         FilterChainBuilder filterChainBuilder = FilterChainBuilder.stateless();
 
@@ -189,15 +190,15 @@ public class StunUtil {
         return socket;
     }
 
-    public static DatagramStunSocket getStunSocket(int port, StunSocketType stunType) throws IOException {
+    public static StunSocket getStunSocket(int port, StunSocketType stunType) throws IOException {
         return getStunSocket(new InetSocketAddress(port), stunType);
     }
 
-    public static DatagramStunSocket getStunSocket(InetAddress address, int port, StunSocketType stunType) throws IOException {
+    public static StunSocket getStunSocket(InetAddress address, int port, StunSocketType stunType) throws IOException {
         return getStunSocket(new InetSocketAddress(address, port), stunType);
     }
 
-    public static DemultiplexerSocket getCustomStunPipeline(InetSocketAddress address, final Filter stunFilter) throws IOException {
+    public static DemultiplexerSocket getCustomStunPipeline(InetSocketAddress address, TransportType transportType, final Filter... stunFilters) throws IOException {
         // Create a FilterChain using FilterChainBuilder
         FilterChainBuilder filterChainBuilder = FilterChainBuilder.stateless();
 
@@ -208,57 +209,78 @@ public class StunUtil {
         // Add the transcoding filter to go from Grizzly Buffers to NIO buffers
         filterChainBuilder.add(new ByteBufferGrizzlyProtocolFilter());
 
-        // Add the packet encoding/decoding filter which does the format
-        //  translation for STUN packets
+        if (transportType == transportType.TCP) {
+            // If we're a TCP socket, we MUST support RFC 4571 framing!
+            filterChainBuilder.add(new RFC4571FramingFilter());
+        }
+        
+        // Add the STUN packet decoder
         filterChainBuilder.add(new StunPacketProtocolFilter());
-
-        // Add the custom stun filter.  This filter may also, optionally handle
-        //  data packets
-        filterChainBuilder.add(stunFilter);
+        
+        // Add the custom filters
+        for (Filter stunFilter : stunFilters) {
+            filterChainBuilder.add(stunFilter);
+        }
 
         // Finally, add the stunSocket class to the top of the chain
         DatagramDemultiplexerSocket socket = new DatagramDemultiplexerSocket(null);
         filterChainBuilder.add(socket);
 
-        // Get the underlying datagram transport
-        UDPNIOTransport transport = getDatagramTransport();
+        if (transportType == transportType.UDP) {
+            // Get the underlying datagram transport
+            UDPNIOTransport transport = getDatagramTransport();
 
+            // Bing the socket to the supplied address
+            UDPNIOServerConnection connection = transport.bind(address);
 
-        UDPNIOServerConnection connection = transport.bind(address);
+            // Add the filter chain
+            connection.setProcessor(filterChainBuilder.build());
 
-        // Add the filter chain
-        connection.setProcessor(filterChainBuilder.build());
+            // Set the server connection
+            socket.setServerConnection(connection);
+        } else {
+            // Get the underlying stream transport
+            TCPNIOTransport transport = getServerSocketChannelFactory();
 
-        socket.setServerConnection(connection);
+            // Bind the socket to the supplied address
+            TCPNIOServerConnection connection = transport.bind(address);
+
+            // Add the filter chain
+            connection.setProcessor(filterChainBuilder.build());
+
+            // Set the server connection
+            socket.setServerConnection(connection);
+
+        }
 
         return socket;
     }
 
-    public static DemultiplexerSocket getCustomStunPipeline(int port, final Filter stunFilter) throws IOException {
-        return getCustomStunPipeline(new InetSocketAddress(port), stunFilter);
+    public static DemultiplexerSocket getCustomStunPipeline(int port, TransportType transportType,final Filter... stunFilters) throws IOException {
+        return getCustomStunPipeline(new InetSocketAddress(port), transportType,stunFilters);
     }
 
-    public static DemultiplexerSocket getCustomStunPipeline(InetAddress address, int port, final Filter stunFilter) throws IOException {
-        return getCustomStunPipeline(new InetSocketAddress(address, port), stunFilter);
+    public static DemultiplexerSocket getCustomStunPipeline(InetAddress address, int port,TransportType transportType, final Filter... stunFilters) throws IOException {
+        return getCustomStunPipeline(new InetSocketAddress(address, port), transportType,stunFilters);
     }
 
-    public static DemultiplexerSocket getCustomStunPipeline(final Filter stunFilter) throws IOException {
-        return getCustomStunPipeline(new InetSocketAddress(0), stunFilter);
+    public static DemultiplexerSocket getCustomStunPipeline(TransportType transportType,final Filter... stunFilters) throws IOException {
+        return getCustomStunPipeline(new InetSocketAddress(0),transportType, stunFilters);
     }
 
-    public static DemultiplexerSocket getDemultiplexerSocket(InetAddress address, int port) throws IOException {
-        return getDemultiplexerSocket(new InetSocketAddress(address, port), null);
+    public static DemultiplexerSocket getDemultiplexerSocket(InetAddress address,TransportType transportType, int port) throws IOException {
+        return getDemultiplexerSocket(new InetSocketAddress(address, port), transportType,null);
     }
 
-    public static DemultiplexerSocket getDemultiplexerSocket(int port) throws IOException {
-        return getDemultiplexerSocket(new InetSocketAddress(port), null);
+    public static DemultiplexerSocket getDemultiplexerSocket(int port,TransportType transportType) throws IOException {
+        return getDemultiplexerSocket(new InetSocketAddress(port), transportType,null);
     }
 
-    public static DemultiplexerSocket getDemultiplexerSocket() throws IOException {
-        return getDemultiplexerSocket((InetSocketAddress) null, null);
+    public static DemultiplexerSocket getDemultiplexerSocket(TransportType transportType) throws IOException {
+        return getDemultiplexerSocket((InetSocketAddress) null, transportType,null);
     }
 
-    public static DemultiplexerSocket getDemultiplexerSocket(InetSocketAddress inetSocketAddress, final StunEventListener stunEventListener) throws IOException {
+    public static DemultiplexerSocket getDemultiplexerSocket(InetSocketAddress inetSocketAddress,TransportType transportType, final StunEventListener stunEventListener) throws IOException {
         // Create a FilterChain using FilterChainBuilder
         FilterChainBuilder filterChainBuilder = FilterChainBuilder.stateless();
 

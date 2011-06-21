@@ -75,11 +75,13 @@ import net.mc_cubed.icedjava.packet.attribute.UsernameAttribute;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
 import net.mc_cubed.icedjava.stun.DemultiplexerSocket;
+import net.mc_cubed.icedjava.stun.StunPacketProtocolFilter;
 import net.mc_cubed.icedjava.stun.StunReply;
 import net.mc_cubed.icedjava.stun.StunUtil;
 import net.mc_cubed.icedjava.stun.TransportType;
 import net.mc_cubed.icedjava.util.ExpiringCache;
 import org.glassfish.grizzly.filterchain.BaseFilter;
+import org.glassfish.grizzly.filterchain.Filter;
 import org.glassfish.grizzly.filterchain.FilterChainContext;
 import org.glassfish.grizzly.filterchain.NextAction;
 
@@ -937,7 +939,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                                 && !address.isLinkLocalAddress()
                                 && !address.isAnyLocalAddress()
                                 && !address.isMulticastAddress()) {
-                            DemultiplexerSocket socket = StunUtil.getCustomStunPipeline(new InetSocketAddress(address, 0), this);
+                            DemultiplexerSocket socket = StunUtil.getCustomStunPipeline(new InetSocketAddress(address, 0),iceSocket.getTransport(),this);
                             socket.setMaxRetries(4);
                             retval.add(new LocalCandidate(
                                     this,
