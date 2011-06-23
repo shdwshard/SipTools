@@ -33,13 +33,14 @@ import javax.sdp.SdpFactory;
 import javax.swing.SwingUtilities;
 import junit.framework.Assert;
 import junit.framework.TestCase;
-import net.mc_cubed.icedjava.ice.IceStateMachine.AgentRole;
 import net.mc_cubed.icedjava.ice.event.IceBytesAvailableEvent;
 import net.mc_cubed.icedjava.ice.event.IceEvent;
 import net.mc_cubed.icedjava.ice.event.IceEventListener;
 import net.mc_cubed.icedjava.stun.StunUtil;
 
 /**
+ * This class runs a series of Local ICE tests using the publicly available ICE
+ * interfaces
  *
  * @author Charles Chappell
  */
@@ -74,8 +75,8 @@ public class LocalICETest extends TestCase {
             form = null;
         }
 
-        IcePeerImpl localPeer = null;
-        IcePeerImpl remotePeer = null;
+        IcePeer localPeer = null;
+        IcePeer remotePeer = null;
 
         try {
             MediaDescription[] medias = new MediaDescription[2];
@@ -88,21 +89,25 @@ public class LocalICETest extends TestCase {
                 IceFactory.createIceSocket(medias[1].getMedia())};
 
             // Create a local peer for a yet unspecified remote peer
-            localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
-            // Set local only mode
-            localPeer.setLocalOnly(true);
+            localPeer = IceFactory.createIcePeer("localPeer", localSockets);
+
             // Create a "remote" peer
-            remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLED, remoteSockets);
-            // Set local only mode
-            remotePeer.setLocalOnly(true);
+            remotePeer = IceFactory.createIcePeer("remotePeer", remoteSockets);
 
             // Establish the SDP connection
             localPeer.setSdpListener(remotePeer);
             remotePeer.setSdpListener(localPeer);
 
+            // Start the local state machine.  This will send an SDP offer then
+            //  wait for a reply.
+            localPeer.start();
+
+            Assert.assertEquals(IceStatus.IN_PROGRESS, localPeer.getStatus());
+            Assert.assertEquals(IceStatus.NOT_STARTED, remotePeer.getStatus());
+
             if (form != null) {
-                form.getLocalPeer().setModel(new PairStatusTableModel(localPeer.checkPairs));
-                form.getRemotePeer().setModel(new PairStatusTableModel(remotePeer.checkPairs));
+                form.getLocalPeer().setModel(new PairStatusTableModel(((IcePeerImpl) localPeer).checkPairs));
+                form.getRemotePeer().setModel(new PairStatusTableModel(((IcePeerImpl) remotePeer).checkPairs));
 
                 SwingUtilities.invokeLater(new Runnable() {
 
@@ -113,11 +118,7 @@ public class LocalICETest extends TestCase {
                 });
             }
 
-            Assert.assertEquals(IceStatus.NOT_STARTED, localPeer.getStatus());
-            Assert.assertEquals(IceStatus.NOT_STARTED, remotePeer.getStatus());
-
             // Start the state machines
-            localPeer.start();
             remotePeer.start();
             // Wait for the threads to run a tiny bit
             Thread.sleep(100);
@@ -166,7 +167,10 @@ public class LocalICETest extends TestCase {
                             ByteBuffer buffer = ByteBuffer.allocate(StunUtil.MAX_PACKET_SIZE);
                             bytesEvent.getSocketChannel().read(buffer);
                             System.out.println("Received Datagram: " + buffer);
-                            System.arraycopy(buffer.array(), buffer.arrayOffset() + buffer.position(), data, 0, Math.min(buffer.remaining(),data.length));
+                            synchronized (data) {
+                                System.arraycopy(buffer.array(), buffer.arrayOffset() + buffer.position(), data, 0, Math.min(buffer.remaining(), data.length));
+                                data.notifyAll();
+                            }
                         } catch (IOException ex) {
                             Logger.getLogger(LocalICETest.class.getName()).log(Level.SEVERE, null, ex);
                         }
@@ -178,12 +182,14 @@ public class LocalICETest extends TestCase {
             ByteBuffer bb = ByteBuffer.allocate(8);
             bb.put("Testing".getBytes());
             bb.flip();
+
             // Write to component 0 of localsocket 0
-            localPeer.getChannels(localSockets[0]).get(0).write(bb);
+            synchronized (data) {
+                localPeer.getChannels(localSockets[0]).get(0).write(bb);
 
-            // Wait for the data to arrive
-            Thread.sleep(100);
-
+                // Wait for the data to arrive
+                data.wait(1000);
+            }
             // Test for the presense of the data
             Assert.assertEquals("Testing", new String(data, 0, 7));
 
@@ -221,8 +227,8 @@ public class LocalICETest extends TestCase {
             form = null;
         }
 
-        IcePeerImpl localPeer = null;
-        IcePeerImpl remotePeer = null;
+        IcePeer localPeer = null;
+        IcePeer remotePeer = null;
 
         try {
             MediaDescription[] medias = new MediaDescription[2];
@@ -235,23 +241,26 @@ public class LocalICETest extends TestCase {
                 IceFactory.createIceSocket(medias[1].getMedia())};
 
             // Create a local peer for a yet unspecified remote peer
-            localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
-            // Set local only mode
-            localPeer.setLocalOnly(true);
-            // Set Aggressive nomination on the controlling peer
-            localPeer.setNomination(IceStateMachine.NominationType.AGGRESSIVE);
+            localPeer = IceFactory.createIcePeer("localPeer", true, localSockets);
+
             // Create a "remote" peer
-            remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLED, remoteSockets);
-            // Set local only mode
-            remotePeer.setLocalOnly(true);
+            remotePeer = IceFactory.createIcePeer("remotePeer", remoteSockets);
 
             // Establish the SDP connection
             localPeer.setSdpListener(remotePeer);
             remotePeer.setSdpListener(localPeer);
 
+            // Start the local state machine.  This will send an SDP offer then
+            //  wait for a reply.
+            localPeer.start();
+
+            Assert.assertEquals(IceStatus.IN_PROGRESS, localPeer.getStatus());
+            Assert.assertEquals(IceStatus.NOT_STARTED, remotePeer.getStatus());
+
+            // Peek at the check pairs so we can see what ICE is actually doing during the test
             if (form != null) {
-                form.getLocalPeer().setModel(new PairStatusTableModel(localPeer.checkPairs));
-                form.getRemotePeer().setModel(new PairStatusTableModel(remotePeer.checkPairs));
+                form.getLocalPeer().setModel(new PairStatusTableModel(((IcePeerImpl) localPeer).checkPairs));
+                form.getRemotePeer().setModel(new PairStatusTableModel(((IcePeerImpl) remotePeer).checkPairs));
 
                 SwingUtilities.invokeLater(new Runnable() {
 
@@ -262,11 +271,7 @@ public class LocalICETest extends TestCase {
                 });
             }
 
-            Assert.assertEquals(IceStatus.NOT_STARTED, localPeer.getStatus());
-            Assert.assertEquals(IceStatus.NOT_STARTED, remotePeer.getStatus());
-
             // Start the state machines
-            localPeer.start();
             remotePeer.start();
             // Wait for the threads to run a tiny bit
             Thread.sleep(100);
@@ -316,7 +321,10 @@ public class LocalICETest extends TestCase {
                             ByteBuffer buffer = ByteBuffer.allocate(StunUtil.MAX_PACKET_SIZE);
                             bytesEvent.getSocketChannel().read(buffer);
                             System.out.println("Received Datagram: " + buffer);
-                            System.arraycopy(buffer.array(), buffer.arrayOffset() + buffer.position(), data, 0, Math.min(buffer.remaining(),data.length));
+                            synchronized (data) {
+                                System.arraycopy(buffer.array(), buffer.arrayOffset() + buffer.position(), data, 0, Math.min(buffer.remaining(), data.length));
+                                data.notifyAll();
+                            }
                         } catch (IOException ex) {
                             Logger.getLogger(LocalICETest.class.getName()).log(Level.SEVERE, null, ex);
                         }
@@ -329,10 +337,12 @@ public class LocalICETest extends TestCase {
             bb.put("Testing".getBytes());
             bb.flip();
             // Write to component 0 of localsocket 0
-            localPeer.getChannels(localSockets[0]).get(0).write(bb);
+            synchronized (data) {
+                localPeer.getChannels(localSockets[0]).get(0).write(bb);
 
-            // Wait for the data to arrive
-            Thread.sleep(100);
+                // Wait for the data to arrive
+                data.wait(1000);
+            }
 
             // Test for the presense of the data
             Assert.assertEquals("Testing", new String(data, 0, 7));
@@ -371,8 +381,8 @@ public class LocalICETest extends TestCase {
             form = null;
         }
 
-        IcePeerImpl localPeer = null;
-        IcePeerImpl remotePeer = null;
+        IcePeer localPeer = null;
+        IcePeer remotePeer = null;
 
         try {
             MediaDescription[] medias = new MediaDescription[2];
@@ -385,21 +395,26 @@ public class LocalICETest extends TestCase {
                 IceFactory.createIceSocket(medias[1].getMedia())};
 
             // Create a local peer for a yet unspecified remote peer
-            localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
-            // Set local only mode
-            localPeer.setLocalOnly(true);
+            localPeer = IceFactory.createIcePeer("localPeer", localSockets);
+
             // Create a "remote" peer
-            remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLING, remoteSockets);
-            // Set local only mode
-            remotePeer.setLocalOnly(true);
+            remotePeer = IceFactory.createIcePeer("remotePeer", remoteSockets);
+
+            // Start the local state machine.  This will send an SDP offer then
+            //  wait for a reply.
+            localPeer.start();
+
+            Assert.assertEquals(IceStatus.IN_PROGRESS, localPeer.getStatus());
+            Assert.assertEquals(IceStatus.NOT_STARTED, remotePeer.getStatus());
 
             // Establish the SDP connection
             localPeer.setSdpListener(remotePeer);
             remotePeer.setSdpListener(localPeer);
 
+            // Peek at the check pairs so we can see what ICE is actually doing during the test
             if (form != null) {
-                form.getLocalPeer().setModel(new PairStatusTableModel(localPeer.checkPairs));
-                form.getRemotePeer().setModel(new PairStatusTableModel(remotePeer.checkPairs));
+                form.getLocalPeer().setModel(new PairStatusTableModel(((IcePeerImpl) localPeer).checkPairs));
+                form.getRemotePeer().setModel(new PairStatusTableModel(((IcePeerImpl) remotePeer).checkPairs));
 
                 SwingUtilities.invokeLater(new Runnable() {
 
@@ -410,18 +425,13 @@ public class LocalICETest extends TestCase {
                 });
             }
 
-            Assert.assertEquals(IceStatus.NOT_STARTED, localPeer.getStatus());
-            Assert.assertEquals(IceStatus.NOT_STARTED, remotePeer.getStatus());
-
             // Start the state machines
-            localPeer.start();
             remotePeer.start();
             // Wait for the threads to run a tiny bit
             Thread.sleep(100);
 
             Assert.assertEquals(IceStatus.IN_PROGRESS, localPeer.getStatus());
             Assert.assertEquals(IceStatus.IN_PROGRESS, remotePeer.getStatus());
-
 
             long startTime = new Date().getTime();
             // Wait for the state machines to die, or 30 seconds to pass
@@ -464,7 +474,10 @@ public class LocalICETest extends TestCase {
                             ByteBuffer buffer = ByteBuffer.allocate(StunUtil.MAX_PACKET_SIZE);
                             bytesEvent.getSocketChannel().read(buffer);
                             System.out.println("Received Datagram: " + buffer);
-                            System.arraycopy(buffer.array(), buffer.arrayOffset() + buffer.position(), data, 0, Math.min(buffer.remaining(),data.length));
+                            synchronized (data) {
+                                System.arraycopy(buffer.array(), buffer.arrayOffset() + buffer.position(), data, 0, Math.min(buffer.remaining(), data.length));
+                                data.notifyAll();
+                            }
                         } catch (IOException ex) {
                             Logger.getLogger(LocalICETest.class.getName()).log(Level.SEVERE, null, ex);
                         }
@@ -477,11 +490,12 @@ public class LocalICETest extends TestCase {
             bb.put("Testing".getBytes());
             bb.flip();
             // Write to component 0 of localsocket 0
-            localPeer.getChannels(localSockets[0]).get(0).write(bb);
+            synchronized (data) {
+                localPeer.getChannels(localSockets[0]).get(0).write(bb);
 
-            // Wait for the data to arrive
-            Thread.sleep(100);
-
+                // Wait for the data to arrive
+                data.wait(1000);
+            }
             // Test for the presense of the data
             Assert.assertEquals("Testing", new String(data, 0, 7));
 
@@ -520,8 +534,8 @@ public class LocalICETest extends TestCase {
             form = null;
         }
 
-        IcePeerImpl localPeer = null;
-        IcePeerImpl remotePeer = null;
+        IcePeer localPeer = null;
+        IcePeer remotePeer = null;
 
         try {
             MediaDescription[] medias = new MediaDescription[2];
@@ -534,25 +548,27 @@ public class LocalICETest extends TestCase {
                 IceFactory.createIceSocket(medias[1].getMedia())};
 
             // Create a local peer for a yet unspecified remote peer
-            localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
-            // Set local only mode
-            localPeer.setLocalOnly(true);
-            // Set Aggressive Nomination on the local peer
-            localPeer.setNomination(IceStateMachine.NominationType.AGGRESSIVE);
+            localPeer = IceFactory.createIcePeer("localPeer", localSockets);
+
             // Create a "remote" peer
-            remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLING, remoteSockets);
-            // Set local only mode
-            remotePeer.setLocalOnly(true);
-            // Set Aggressive nomination on the remote peer
-            remotePeer.setNomination(IceStateMachine.NominationType.AGGRESSIVE);
+            remotePeer = IceFactory.createIcePeer("remotePeer", remoteSockets);
+
+            // Start the local state machine.  This will send an SDP offer then
+            //  wait for a reply. This offer will turn remotePeer into the
+            //  controlled peer.
+            localPeer.start();
+
+            Assert.assertEquals(IceStatus.IN_PROGRESS, localPeer.getStatus());
+            Assert.assertEquals(IceStatus.NOT_STARTED, remotePeer.getStatus());
 
             // Establish the SDP connection
             localPeer.setSdpListener(remotePeer);
             remotePeer.setSdpListener(localPeer);
 
+            // Peek at the check pairs so we can see what ICE is actually doing during the test
             if (form != null) {
-                form.getLocalPeer().setModel(new PairStatusTableModel(localPeer.checkPairs));
-                form.getRemotePeer().setModel(new PairStatusTableModel(remotePeer.checkPairs));
+                form.getLocalPeer().setModel(new PairStatusTableModel(((IcePeerImpl) localPeer).checkPairs));
+                form.getRemotePeer().setModel(new PairStatusTableModel(((IcePeerImpl) remotePeer).checkPairs));
 
                 SwingUtilities.invokeLater(new Runnable() {
 
@@ -563,11 +579,7 @@ public class LocalICETest extends TestCase {
                 });
             }
 
-            Assert.assertEquals(IceStatus.NOT_STARTED, localPeer.getStatus());
-            Assert.assertEquals(IceStatus.NOT_STARTED, remotePeer.getStatus());
-
             // Start the state machines
-            localPeer.start();
             remotePeer.start();
             // Wait for the threads to run a tiny bit
             Thread.sleep(100);
@@ -617,7 +629,10 @@ public class LocalICETest extends TestCase {
                             ByteBuffer buffer = ByteBuffer.allocate(StunUtil.MAX_PACKET_SIZE);
                             bytesEvent.getSocketChannel().read(buffer);
                             System.out.println("Received Datagram: " + buffer);
-                            System.arraycopy(buffer.array(), buffer.arrayOffset() + buffer.position(), data, 0, Math.min(buffer.remaining(),data.length));
+                            synchronized (data) {
+                                System.arraycopy(buffer.array(), buffer.arrayOffset() + buffer.position(), data, 0, Math.min(buffer.remaining(), data.length));
+                                data.notifyAll();
+                            }
                         } catch (IOException ex) {
                             Logger.getLogger(LocalICETest.class.getName()).log(Level.SEVERE, null, ex);
                         }
@@ -630,11 +645,12 @@ public class LocalICETest extends TestCase {
             bb.put("Testing".getBytes());
             bb.flip();
             // Write to component 0 of localsocket 0
-            localPeer.getChannels(localSockets[0]).get(0).write(bb);
+            synchronized (data) {
+                localPeer.getChannels(localSockets[0]).get(0).write(bb);
 
-            // Wait for the data to arrive
-            Thread.sleep(100);
-
+                // Wait for the data to arrive
+                data.wait(1000);
+            }
             // Test for the presense of the data
             Assert.assertEquals("Testing", new String(data, 0, 7));
 

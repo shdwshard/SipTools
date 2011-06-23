@@ -22,6 +22,7 @@ package net.mc_cubed.icedjava.ice;
 import net.mc_cubed.icedjava.ice.Candidate.CandidateType;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.Future;
 
 /**
  * Pairs a LocalCandidate and a RemoteCandidate and stores limited state
@@ -37,6 +38,7 @@ public class CandidatePair {
 
     protected boolean localControlled;
     protected Long priority;
+    private Future<IceReply> replyFuture;
 
     /**
      * Get the value of localCandidate
@@ -275,5 +277,23 @@ public class CandidatePair {
      */
     public String getFoundation() {
         return localCandidate.getFoundation() + remoteCandidate.getFoundation();
+    }
+    
+    /**
+     * Get the reply future used to test this candidate
+     * 
+     * @return Future with the Ice Test Result
+     */
+    public Future<IceReply> getReplyFuture() {
+        return replyFuture;
+    }
+    
+    /**
+     * Set the future for later ice result testing.
+     * 
+     * @param iceFuture 
+     */
+    public void setReplyFuture(Future<IceReply> iceFuture) {
+        this.replyFuture = iceFuture;
     }
 }

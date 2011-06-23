@@ -31,7 +31,6 @@ import net.mc_cubed.icedjava.packet.attribute.FingerprintAttribute;
 import net.mc_cubed.icedjava.packet.attribute.MappedAddressAttribute;
 import net.mc_cubed.icedjava.packet.attribute.SoftwareAttribute;
 import net.mc_cubed.icedjava.packet.attribute.XORMappedAddressAttribute;
-import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.stun.StunReply;
 
 /**
@@ -41,7 +40,7 @@ import net.mc_cubed.icedjava.stun.StunReply;
  * @author Charles Chappell
  * @since 0.9
  */
-class IceReplyImpl implements IceReply,StunReply {
+class IceReplyImpl implements IceReply, StunReply {
 
     private final StunPacket packet;
     private final boolean success;
@@ -53,34 +52,37 @@ class IceReplyImpl implements IceReply,StunReply {
     private Map<AttributeType, Attribute> attrMap = new HashMap<AttributeType, Attribute>();
 
     public IceReplyImpl(StunReply reply) {
-        this.packet = reply.getPacket();
-        success = packet.getMessageClass() == MessageClass.SUCCESS;
-        for (Attribute attr : packet.getAttributes()) {
-            attrMap.put(attr.getType(), attr);
-            if (attr.getType() == AttributeType.MAPPED_ADDRESS) {
-                MappedAddressAttribute maa = (MappedAddressAttribute) attr;
-                mappedAddress = new InetSocketAddress(maa.getAddress(), maa.getPort());
-            }
-            if (attr.getType() == AttributeType.XOR_MAPPED_ADDRESS) {
-                XORMappedAddressAttribute xmaa = (XORMappedAddressAttribute) attr;
-                mappedAddress = new InetSocketAddress(
-                        xmaa.getAddress(packet.getTransactionId()),
-                        xmaa.getPort());
-            }
-            if (attr.getType() == AttributeType.ERROR_CODE) {
-                ErrorCodeAttribute eca = (ErrorCodeAttribute) attr;
-                errorCode = eca.getError();
-                errorReason = eca.getReason();
-            }
-            if (attr.getType() == AttributeType.FINGERPRINT) {
-                FingerprintAttribute finger = (FingerprintAttribute) attr;
-                validFingerprint = finger.isValid();
+        packet = reply.getPacket();
+        success = reply.isSuccess();
+        errorReason = reply.getErrorReason();
+        errorCode = reply.getErrorCode();
+        if (packet != null) {
+            for (Attribute attr : packet.getAttributes()) {
+                attrMap.put(attr.getType(), attr);
+                if (attr.getType() == AttributeType.MAPPED_ADDRESS) {
+                    MappedAddressAttribute maa = (MappedAddressAttribute) attr;
+                    mappedAddress = new InetSocketAddress(maa.getAddress(), maa.getPort());
+                }
+                if (attr.getType() == AttributeType.XOR_MAPPED_ADDRESS) {
+                    XORMappedAddressAttribute xmaa = (XORMappedAddressAttribute) attr;
+                    mappedAddress = new InetSocketAddress(
+                            xmaa.getAddress(packet.getTransactionId()),
+                            xmaa.getPort());
+                }
+                if (attr.getType() == AttributeType.ERROR_CODE) {
+                    ErrorCodeAttribute eca = (ErrorCodeAttribute) attr;
+                    errorCode = eca.getError();
+                    errorReason = eca.getReason();
+                }
+                if (attr.getType() == AttributeType.FINGERPRINT) {
+                    FingerprintAttribute finger = (FingerprintAttribute) attr;
+                    validFingerprint = finger.isValid();
+                }
             }
         }
-
     }
 
-    public IceReplyImpl(Exception ex) {
+    public IceReplyImpl(Throwable ex) {
         packet = null;
         success = false;
         errorReason = ex.getLocalizedMessage();

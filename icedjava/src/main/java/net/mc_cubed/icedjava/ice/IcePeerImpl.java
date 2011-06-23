@@ -46,6 +46,11 @@ class IcePeerImpl extends IceStateMachine implements IcePeer {
     public IcePeerImpl(String peerId, AgentRole agentRole, IceSocket ... sockets) throws SdpException {
         this(peerId, agentRole, null, null, sockets);
     }
+    
+    public IcePeerImpl(String peerId, AgentRole agentRole, NominationType nomination, IceSocket ... sockets) throws SdpException {
+        this(peerId, agentRole, null, null, sockets);
+        this.setNomination(nomination);
+    }
 
     public IcePeerImpl() throws SdpException {
         this((IceSocket)null);
@@ -110,7 +115,7 @@ class IcePeerImpl extends IceStateMachine implements IcePeer {
 
     @Override
     public String getPeerId() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return peerId;
     }
 
 }

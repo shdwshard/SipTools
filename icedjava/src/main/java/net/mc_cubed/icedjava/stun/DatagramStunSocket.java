@@ -38,6 +38,8 @@ import java.util.logging.Logger;
 import net.mc_cubed.icedjava.packet.StunPacket;
 import net.mc_cubed.icedjava.packet.attribute.AttributeFactory;
 import org.glassfish.grizzly.Connection;
+import org.glassfish.grizzly.GrizzlyFuture;
+import org.glassfish.grizzly.WriteResult;
 import org.glassfish.grizzly.filterchain.BaseFilter;
 import org.glassfish.grizzly.filterchain.FilterChain;
 import org.glassfish.grizzly.filterchain.FilterChainContext;
@@ -125,7 +127,10 @@ class DatagramStunSocket extends BaseFilter implements StunSocket {
                      * have failed.
                      */
                     for (int i = 0; i < maxRetries; i++) {
-                        filterChain.get().write(connection.get(), new InetSocketAddress(server, port), request, null);
+                        GrizzlyFuture<WriteResult> future = filterChain.get().write(connection.get(), new InetSocketAddress(server, port), request, null);
+
+                        // Wait for the write to finish
+                        future.get(250, TimeUnit.MILLISECONDS);
 
                         /**
                          * RFC 5389 7.2.1:
@@ -141,16 +146,12 @@ class DatagramStunSocket extends BaseFilter implements StunSocket {
                         }
                     }
                 } catch (InterruptedException ex) {
-                    Logger.getLogger(DatagramStunSocket.class.getName()).log(Level.SEVERE, null, ex);
                     replyFuture.setReply(new StunReplyImpl(ex));
                 } catch (ExecutionException ex) {
-                    Logger.getLogger(DatagramStunSocket.class.getName()).log(Level.SEVERE, null, ex);
                     replyFuture.setReply(new StunReplyImpl(ex));
                 } catch (TimeoutException ex) {
-                    Logger.getLogger(DatagramStunSocket.class.getName()).log(Level.SEVERE, null, ex);
                     replyFuture.setReply(new StunReplyImpl(ex));
                 } catch (IOException ex) {
-                    Logger.getLogger(DatagramStunSocket.class.getName()).log(Level.SEVERE, null, ex);
                     replyFuture.setReply(new StunReplyImpl(ex));
                 } finally {
                     try {
@@ -159,6 +160,7 @@ class DatagramStunSocket extends BaseFilter implements StunSocket {
                         }
                     } catch (Throwable t) {
                         // Do nothing, probably the JVM is shutting down
+                        log.log(Level.SEVERE, "Caught a throwable trying to cancel a StunFuture. This is likely a bug!", t);
                     }
                 }
             }
@@ -337,6 +339,7 @@ class DatagramStunSocket extends BaseFilter implements StunSocket {
 
         protected synchronized void setReply(StunReply reply) {
             this.stunReply = reply;
+            timeout = stunReply == null;
             notifyAll();
         }
     }

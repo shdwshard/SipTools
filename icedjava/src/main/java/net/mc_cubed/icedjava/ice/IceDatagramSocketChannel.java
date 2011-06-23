@@ -99,7 +99,7 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
     public int write(ByteBuffer bb) throws IOException {
         int position = bb.position();
         try {
-            CandidatePair pair = peer.nominated.get(iceSocket).get(component);
+            CandidatePair pair = peer.using.get(iceSocket).get(component);
             pair.localCandidate.socket.send(bb, pair.remoteCandidate.socketAddress);
         } catch (NullPointerException ex) {
             log.log(Level.FINEST, "Socket not fully setup before write submitted.  Data is being lost", ex);

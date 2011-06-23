@@ -44,9 +44,12 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.StringTokenizer;
 import java.util.Vector;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.enterprise.inject.Instance;
@@ -137,6 +140,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     private final long tieBreaker;
     protected static SecureRandom random = new SecureRandom();
     protected final Map<IceSocket, List<CandidatePair>> nominated = new HashMap<IceSocket, List<CandidatePair>>();
+    protected final Map<IceSocket, List<CandidatePair>> using = new HashMap<IceSocket, List<CandidatePair>>();
     protected final List<InterfaceProfile> interfaceData;
     @Inject
     @AddressDiscoveryMechanism
@@ -205,6 +209,10 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     @Override
     public Map<IceSocket, List<CandidatePair>> getNominated() {
         return nominated;
+    }
+
+    public Map<IceSocket, List<CandidatePair>> getUsing() {
+        return using;
     }
 
     /**
@@ -315,25 +323,32 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         }
     }
 
-    @Override
-    public void run() {
-        this.getThreadpool().execute(new Runnable() {
-
-            @Override
-            public void run() {
-                _run();
-            }
-        });
-    }
-
     /*
      * This method implements the ICE State machine.  It is called periodically
      */
-    public void _run() {
+    @Override
+    public synchronized void run() {
         log.entering(getClass().getName(), "run");
         // Ice negociation phase
         try {
+
             if (iceStatus == IceStatus.IN_PROGRESS) {
+                // First check for any finished pairs
+                for (Entry<IceSocket, List<CandidatePair>> pairsEntry : checkPairs.entrySet()) {
+                    IceSocket socket = pairsEntry.getKey();
+                    List<CandidatePair> pairs = pairsEntry.getValue();
+                    for (CandidatePair pair : getPairsInState(pairs, PairState.IN_PROGRESS)) {
+                        if (pair.getReplyFuture() != null) {
+                            if (pair.getReplyFuture().isDone()) {
+                                checkTestResult(socket, pair);
+                            }
+                        } else {
+                            log.log(Level.SEVERE, "BUG: Found an In-Progress pair with a null future: {0}", pair);
+                            pair.setState(PairState.FAILED);
+                        }
+                    }
+                }
+
                 // If we're controlling, send the SDP offer if timeout has occured,
                 // or it hasn't been sent yet.
                 if (localRole == AgentRole.CONTROLLING) {
@@ -357,7 +372,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
                 // Do we have a remote uFrag and Password?
                 if (remoteUFrag == null || remotePassword == null || checkPairs == null) {
-                    log.log(Level.FINE, "{0} waiting on peer for offer in {1} role.", new Object[]{this, localRole});
+                    log.log(Level.INFO, "{0} waiting on peer for offer in {1} role.", new Object[]{getPeerId(), localRole});
                 } else {
                     // Check ICE status
                     checkStatus();
@@ -427,6 +442,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                             for (List<CandidatePair> pairs : checkPairs.values()) {
                                 int inProgressPairCounts = pairsInState(pairs, PairState.IN_PROGRESS);
                                 if (inProgressPairCounts > 0) {
+
                                     // End this round
                                     log.log(Level.FINE, "{0} Waiting for {1} tests to finish...", new Object[]{localUFrag, inProgressPairCounts});
                                     return;
@@ -507,7 +523,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                                         isLocalControlled(),
                                         PEER_REFLEXIVE_PRIORITY,
                                         tieBreaker,
-                                        true);
+                                        true).get();
                                 if (result != null) {
                                     if (pair == null || pair.getLocalCandidate() == null || pair.getRemoteCandidate() == null) {
                                         log.log(Level.WARNING, "Got a strange candidate pair: {0}", pair);
@@ -546,12 +562,12 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         log.exiting(getClass().getName(), "run");
     }
 
-    protected void runOneTest(IceSocket socket, CandidatePair pair) {
-        try {
-            synchronized (pair) {
+    protected void startOneTest(IceSocket socket, CandidatePair pair) {
+        synchronized (pair) {
+            try {
                 if (pair.getState() == PairState.WAITING) {
                     pair.setState(PairState.IN_PROGRESS);
-                    IceReply result = doIceTest(
+                    Future<IceReply> resultFuture = doIceTest(
                             pair,
                             localUFrag, // Local UserFrag
                             remoteUFrag, // Remote UserFrag
@@ -560,6 +576,23 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                             PEER_REFLEXIVE_PRIORITY,
                             tieBreaker,
                             nomination == NominationType.AGGRESSIVE);
+                    pair.setReplyFuture(resultFuture);
+                }
+            } catch (Exception ex) {
+                // Ensure any errors will knock the pair out of the IN_PROGRESS state
+                if (pair.getState() == PairState.IN_PROGRESS) {
+                    pair.setState(PairState.FAILED);
+                }
+            }
+        }
+    }
+
+    protected void checkTestResult(IceSocket socket, CandidatePair pair) {
+        // Fast abort: we shouldn't check this if it's not done.        
+        if (pair.getReplyFuture() == null || pair.getReplyFuture().isDone()) {
+            try {
+                synchronized (pair) {
+                    IceReply result = pair.getReplyFuture().get();
                     if (result.isSuccess()) {
                         pair.setState(PairState.SUCCEEDED);
 
@@ -622,9 +655,126 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                             if (result.getAttribute(AttributeType.ICE_CONTROLLED) != null) {
                                 IceControlledAttribute remote = (IceControlledAttribute) result.getAttribute(AttributeType.ICE_CONTROLLED);
                                 remoteTieBreaker = remote.getNumber();
-                            } else {
+                            } else if (result.getAttribute(AttributeType.ICE_CONTROLLING) != null) {
                                 IceControllingAttribute remote = (IceControllingAttribute) result.getAttribute(AttributeType.ICE_CONTROLLING);
                                 remoteTieBreaker = remote.getNumber();
+                            } else {
+                                throw new java.lang.IllegalStateException("Got an ICE packet without an ICE_CONTROLLED or ICE_CONTROLLING attribute");
+                            }
+
+                            final boolean control;
+                            if (remoteTieBreaker >= tieBreaker) {
+                                // We switch to controlled
+                                control = false;
+                            } else {
+                                // We switch to controlling
+                                control = true;
+                            }
+
+                            setLocalControlled(control);
+
+                            return;
+                        }
+                        pair.setState(PairState.FAILED);
+                    }
+                    log.log(Level.FINE, "{0}:{1} -> {2}:{3} - {4} - {5}", new Object[]{pair.getLocalCandidate().getAddress(), pair.getLocalCandidate().getPort(), pair.getRemoteCandidate().getAddress(), pair.getRemoteCandidate().getPort(), pair.getState(), (result.isSuccess()) ? result.getMappedAddress() : result.getErrorReason()});
+                }
+            } catch (ExecutionException ex) {
+                log.log(Level.WARNING, "Caught an exception on a finished future.  This is probably a bug", ex);
+            } catch (InterruptedException ex) {
+                log.log(Level.WARNING, "Caught an exception on a finished future.  This is probably a bug", ex);
+            } finally {
+                // Ensure there won't be any pairs still in progress after this function ends
+                if (pair.getState() == PairState.IN_PROGRESS) {
+                    pair.setState(PairState.FAILED);
+                }
+            }
+        }
+
+    }
+
+    @Deprecated
+    protected void runOneTest(IceSocket socket, CandidatePair pair) {
+        try {
+            synchronized (pair) {
+                if (pair.getState() == PairState.WAITING) {
+                    pair.setState(PairState.IN_PROGRESS);
+                    IceReply result = doIceTest(
+                            pair,
+                            localUFrag, // Local UserFrag
+                            remoteUFrag, // Remote UserFrag
+                            remotePassword, // Password
+                            isLocalControlled(),
+                            PEER_REFLEXIVE_PRIORITY,
+                            tieBreaker,
+                            nomination == NominationType.AGGRESSIVE).get();
+                    if (result.isSuccess()) {
+                        pair.setState(PairState.SUCCEEDED);
+
+                        // Check for a Peer Reflexive Candidate
+                        InetSocketAddress mappedAddress = result.getMappedAddress();
+                        List<LocalCandidate> lclist = socketCandidateMap.get(socket);
+                        boolean matched = false;
+                        for (LocalCandidate candidate : lclist) {
+                            if (candidate.getSocketAddress().equals(mappedAddress)) {
+                                matched = true;
+                                break;
+                            }
+                        }
+
+                        if (!matched) {
+                            // Generate a peer reflexive candidate, mark it succeeded and add it to the list
+                            LocalCandidate local = new LocalCandidate(
+                                    pair.getLocalCandidate().getOwner(),
+                                    pair.getLocalCandidate().getIceSocket(),
+                                    CandidateType.PEER_REFLEXIVE,
+                                    mappedAddress.getAddress(),
+                                    mappedAddress.getPort(), pair.getLocalCandidate());
+                            CandidatePair peerReflexPair = new CandidatePair(local, pair.getRemoteCandidate(), isLocalControlled());
+                            peerReflexPair.setState(PairState.SUCCEEDED);
+                            log.log(Level.FINE, "New peer reflexive pair: {0} <-> {1}", new Object[]{peerReflexPair.getLocalCandidate().getSocketAddress(), peerReflexPair.getRemoteCandidate().getSocketAddress()});
+
+                            checkPairs.get(socket).add(peerReflexPair);
+                        } else {
+                            // Unfreeze other pairs with the same foundation
+                            for (IceSocket updateSocket : checkPairs.keySet()) {
+                                for (CandidatePair candidate : checkPairs.get(updateSocket)) {
+                                    if (candidate.getFoundation().compareTo(pair.getFoundation()) == 0
+                                            && candidate.getState() == PairState.FROZEN) {
+                                        candidate.setState(PairState.WAITING);
+                                    }
+                                }
+                            }
+
+                        }
+
+                        /**
+                         * Special case:
+                         * Aggressive Nomination type nominates the first 
+                         * successful test on each channel/component, so we 
+                         * should re-freeze all other tests in the WAITING state
+                         * with the same channel/componentId
+                         */
+                        if (nomination == NominationType.AGGRESSIVE) {
+                            nominate(pair);
+                            for (CandidatePair checkPair : checkPairs.get(pair.getLocalCandidate().getIceSocket())) {
+                                if (checkPair.getComponentId() == pair.getComponentId() && checkPair.getState() == PairState.WAITING) {
+                                    checkPair.setState(PairState.FROZEN);
+                                }
+                            }
+
+                        }
+                    } else {
+                        if (result.getErrorCode() == ROLE_CONFLICT) {
+                            long remoteTieBreaker;
+                            if (result.getAttribute(AttributeType.ICE_CONTROLLED) != null) {
+                                IceControlledAttribute remote = (IceControlledAttribute) result.getAttribute(AttributeType.ICE_CONTROLLED);
+                                remoteTieBreaker = remote.getNumber();
+                            } else if (result.getAttribute(AttributeType.ICE_CONTROLLING) != null) {
+                                IceControllingAttribute remote = (IceControllingAttribute) result.getAttribute(AttributeType.ICE_CONTROLLING);
+                                remoteTieBreaker = remote.getNumber();
+                            } else {
+                                throw new java.lang.IllegalStateException("Got an ICE packet without an ICE_CONTROLLED or ICE_CONTROLLING attribute");
                             }
 
                             final boolean control;
@@ -645,6 +795,10 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                     log.log(Level.FINE, "{0}:{1} -> {2}:{3} - {4} - {5}", new Object[]{pair.getLocalCandidate().getAddress(), pair.getLocalCandidate().getPort(), pair.getRemoteCandidate().getAddress(), pair.getRemoteCandidate().getPort(), pair.getState(), (result.isSuccess()) ? result.getMappedAddress() : result.getErrorReason()});
                 }
             }
+        } catch (InterruptedException ex) {
+            Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (ExecutionException ex) {
+            Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, null, ex);
         } finally {
             // Ensure there won't be any pairs still in progress after this function ends
             if (pair.getState() == PairState.IN_PROGRESS) {
@@ -685,6 +839,11 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             getThreadpool().shutdownNow();
         } else {
             getThreadpool().shutdown();
+        }
+        try {
+            getThreadpool().awaitTermination(5, TimeUnit.SECONDS);
+        } catch (InterruptedException ex) {
+            Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, "Exception during threadpool shutdown", ex);
         }
     }
 
@@ -1067,6 +1226,13 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                 if (status == IceStatus.SUCCESS) {
                     // Update ICE status
                     iceStatus = status;
+                    // Replace the contents of the Using sockets with the newly
+                    // nominated pairs.  This usage method supports hot
+                    // re-negociation
+                    using.putAll(nominated);
+
+                    // TODO: Shut down unused sockets, preserving only the used
+                    // socket pairs
                 }
             }
         }
@@ -1092,7 +1258,16 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             } else {
                 status = IceStatus.FAILED;
             }
+
+            if (status == IceStatus.SUCCESS) {
+                using.putAll(nominated);
+            }
             iceStatus = status;
+
+            /*if (iceStatus == IceStatus.FAILED && isLocalControlled()) {
+                doReset(true);
+            }*/
+
         }
 
     }
@@ -1107,6 +1282,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     @Override
     @Deprecated
     final public void sendSession(SessionDescription session) throws SdpException {
+
         List<Attribute> iceAttributes = new LinkedList<Attribute>();
         for (Attribute attr : (Vector<Attribute>) session.getAttributes(icelite)) {
             if (attr.getName().equalsIgnoreCase(IceStateMachine.SDP_ICE_LITE)
@@ -1145,6 +1321,17 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     public void updateMedia(final Connection conn, final List<Attribute> iceAttributes, final List<MediaDescription> iceMedias)
             throws SdpParseException {
         log.log(Level.FINE, "SDP Update to {0}\n{1}\n{2}", new Object[]{localUFrag, iceAttributes, iceMedias});
+        /**
+         * Special case - Received a Session Description before processing
+         * started. In this event, we are definitely the controlled peer, and
+         * should behave as such
+         */
+        if (this.getStatus() == IceStatus.NOT_STARTED) {
+            log.log(Level.FINE, "Received a session description before ICE "
+                    + "processing start. Switching to CONTROLLED role");
+            localRole = AgentRole.CONTROLLED;
+        }
+
         getThreadpool().execute(new Runnable() {
 
             @Override
@@ -1453,7 +1640,23 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             }
         }
         return count;
+    }
 
+    /**
+     * Get a list of pairs in a specified state
+     *
+     * @param pairs Source pairs
+     * @param pairState State to search for
+     * @return a list of pairs in the specified state
+     */
+    private List<CandidatePair> getPairsInState(List<CandidatePair> pairs, PairState pairState) {
+        List<CandidatePair> retval = new LinkedList<CandidatePair>();
+        for (CandidatePair pair : pairs) {
+            if (pair.getState() == pairState) {
+                retval.add(pair);
+            }
+        }
+        return retval;
     }
 
     private CandidatePair getFirstWaitingPair(List<CandidatePair> pairs) {
@@ -1495,7 +1698,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      * @param nominate Send a USE-CANDIDATE flag
      * @return the ICE Reply, whether successful or not
      */
-    public IceReply doIceTest(CandidatePair pair, String localUFrag, String remoteUFrag,
+    public Future<IceReply> doIceTest(CandidatePair pair, String localUFrag, String remoteUFrag,
             String remotePassword, boolean controlling, int peerReflexPriority,
             long tieBreaker, boolean nominate) {
         try {
@@ -1519,16 +1722,79 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             stunPacket.getAttributes().add(AttributeFactory.createFingerprintAttribute());
             // Stun it
             log.log(Level.FINER, "Ice Test {0} -> {1}", new Object[]{pair.getLocalCandidate().getSocketAddress(), pair.getRemoteCandidate().getSocketAddress()});
-            StunReply reply = pair.localCandidate.socket.doTest(pair.getRemoteCandidate().getSocketAddress(), stunPacket).get();
 
-            return new IceReplyImpl(reply);
+            Future<StunReply> replyFuture = pair.localCandidate.socket.doTest(pair.getRemoteCandidate().getSocketAddress(), stunPacket);
+
+            return new IceReplyFuture(replyFuture);
+        } catch (IOException ex) {
+            return new IceReplyFuture(ex);
         } catch (InterruptedException ex) {
-            Logger.getLogger(IceDatagramSocket.class.getName()).log(Level.SEVERE, null, ex);
-            throw new RuntimeException(ex);
-        } catch (Exception ex) {
-            return new IceReplyImpl(ex);
+            return new IceReplyFuture(ex);
         }
 
+    }
+
+    class IceReplyFuture implements Future<IceReply> {
+
+        final Future<StunReply> stunReplyFuture;
+        final Throwable cause;
+
+        IceReplyFuture(Future<StunReply> stunReplyFuture) {
+            this.stunReplyFuture = stunReplyFuture;
+            this.cause = null;
+        }
+
+        IceReplyFuture(Throwable ex) {
+            this.cause = ex;
+            this.stunReplyFuture = null;
+        }
+
+        @Override
+        public boolean cancel(boolean bln) {
+            if (stunReplyFuture != null) {
+                return stunReplyFuture.cancel(bln);
+            } else {
+                return false;
+            }
+        }
+
+        @Override
+        public boolean isCancelled() {
+            if (cause != null) {
+                return true;
+            } else {
+                return stunReplyFuture.isCancelled();
+            }
+        }
+
+        @Override
+        public boolean isDone() {
+            if (cause != null) {
+                return true;
+            } else {
+                return stunReplyFuture.isDone();
+            }
+        }
+
+        @Override
+        public IceReply get() throws InterruptedException, ExecutionException {
+            if (cause != null) {
+                return new IceReplyImpl(cause);
+            } else {
+                StunReply reply = stunReplyFuture.get();
+                return reply != null ? new IceReplyImpl(reply) : null;
+            }
+        }
+
+        @Override
+        public IceReply get(long l, TimeUnit tu) throws InterruptedException, ExecutionException, TimeoutException {
+            if (cause != null) {
+                return new IceReplyImpl(cause);
+            } else {
+                StunReply reply = stunReplyFuture.get(l, tu);
+                return reply != null ? new IceReplyImpl(reply) : null;
+            }
+        }
     }
 
     /**
@@ -2045,12 +2311,14 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
         } else {
             if (pair != null) {
-                if (!nominated.containsKey(pair.getLocalCandidate().getIceSocket())) {
-                    nominated.put(pair.getLocalCandidate().getIceSocket(), new ArrayList<CandidatePair>(pair.getLocalCandidate().getIceSocket().getComponents()));
-                    for (int i = 0; i < pair.getLocalCandidate().getIceSocket().getComponents(); i++) {
-                        nominated.get(pair.getLocalCandidate().getIceSocket()).add(null);
-                    }
+                synchronized (nominated) {
+                    if (!nominated.containsKey(pair.getLocalCandidate().getIceSocket())) {
+                        nominated.put(pair.getLocalCandidate().getIceSocket(), new ArrayList<CandidatePair>(pair.getLocalCandidate().getIceSocket().getComponents()));
+                        for (int i = 0; i < pair.getLocalCandidate().getIceSocket().getComponents(); i++) {
+                            nominated.get(pair.getLocalCandidate().getIceSocket()).add(null);
+                        }
 
+                    }
                 }
                 nominated.get(pair.getLocalCandidate().getIceSocket()).set(pair.getLocalCandidate().getComponentId(), pair);
 
@@ -2140,6 +2408,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         triggeredCheckQueue.clear();
         localUFrag = generateHashString(UFRAG_LENGTH);
         localPassword = generateHashString(PASSWORD_LENGTH);
+        nominated.clear();
 
         setSdpTimeout(true);
 
@@ -2231,7 +2500,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         if (socket != null) {
             if (getNominated().get(socket) != null
                     && getNominated().get(socket).size() > componentId) {
-                List<CandidatePair> pairs = getNominated().get(socket);                
+                List<CandidatePair> pairs = getNominated().get(socket);
                 if (componentId != null) {
                     if (pairs.get(componentId).getRemoteCandidate().getSocketAddress().equals(address)) {
                         return true;

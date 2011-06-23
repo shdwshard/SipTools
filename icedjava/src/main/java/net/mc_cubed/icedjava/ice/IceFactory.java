@@ -23,6 +23,8 @@ import java.net.SocketException;
 import javax.sdp.Media;
 import javax.sdp.SdpException;
 import javax.sdp.SdpParseException;
+import net.mc_cubed.icedjava.ice.IceStateMachine.AgentRole;
+import net.mc_cubed.icedjava.ice.IceStateMachine.NominationType;
 
 /**
  * Factory Class to create ICE types.
@@ -70,6 +72,31 @@ public class IceFactory {
      */
     public static IcePeer createIcePeer(IceSocket... sockets) throws SdpException {
         return new IcePeerImpl(sockets);
+    }
+    
+    /**
+     * Create a named IcePeer bound to the supplied sockets
+     * 
+     * @param peerId Name to assign the peer
+     * @param sockets Sockets to bind the peer to
+     * @return An initialized IcePeer bound to the supplied sockets
+     * @throws SdpException 
+     */
+    public static IcePeer createIcePeer(String peerId,IceSocket... sockets) throws SdpException {
+        return new IcePeerImpl(peerId,AgentRole.CONTROLLING,sockets);
+    }
+
+    /**
+     * Create a named IcePeer bound to the supplied sockets
+     * 
+     * @param peerId Name to assign the peer
+     * @param aggressive Use aggressive ICE nomination if true, regular nomination if false
+     * @param sockets Sockets to bind the peer to
+     * @return An initialized IcePeer bound to the supplied sockets
+     * @throws SdpException 
+     */
+    public static IcePeer createIcePeer(String peerId,boolean aggressive,IceSocket... sockets) throws SdpException {
+        return new IcePeerImpl(peerId,AgentRole.CONTROLLING,aggressive ? NominationType.AGGRESSIVE: NominationType.REGULAR,sockets);
     }
 
     private IceFactory() {
