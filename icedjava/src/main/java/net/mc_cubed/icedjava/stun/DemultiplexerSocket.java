@@ -62,4 +62,6 @@ public interface DemultiplexerSocket extends StunSocketChannel,StunPacketSender 
 
     public Socket getSocket() throws IOException;
 
+    public TCPSocketType getTcpSocketType();
+
 }

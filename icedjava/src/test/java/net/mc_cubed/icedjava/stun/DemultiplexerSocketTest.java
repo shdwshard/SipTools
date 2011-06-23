@@ -46,8 +46,8 @@ public class DemultiplexerSocketTest extends TestCase {
 
     public void testUDPSocket() throws Exception, Throwable {
         System.out.println("socket");
-        DemultiplexerSocket instance1 = StunUtil.getDemultiplexerSocket(1234,TransportType.UDP);
-        DemultiplexerSocket instance2 = StunUtil.getDemultiplexerSocket(5678,TransportType.UDP);
+        DemultiplexerSocket instance1 = StunUtil.getDemultiplexerSocket(1234);
+        DemultiplexerSocket instance2 = StunUtil.getDemultiplexerSocket(5678);
 
         StunReply i1reply = instance1.doTest(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 5678)).get();
         StunReply i2reply = instance2.doTest(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 1234)).get();
@@ -66,8 +66,8 @@ public class DemultiplexerSocketTest extends TestCase {
 
     public void testTCPSocket() throws Exception, Throwable {
         System.out.println("socket");
-        DemultiplexerSocket instance1 = StunUtil.getDemultiplexerSocket(1234,TransportType.TCP);
-        DemultiplexerSocket instance2 = StunUtil.getDemultiplexerSocket(5678,TransportType.TCP);
+        DemultiplexerSocket instance1 = StunUtil.getDemultiplexerSocket(new InetSocketAddress(1234),TransportType.TCP,true,null);
+        DemultiplexerSocket instance2 = StunUtil.getDemultiplexerSocket(new InetSocketAddress(5678),TransportType.TCP,false,null);
 
         StunReply i1reply = instance1.doTest(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 5678)).get();
         StunReply i2reply = instance2.doTest(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 1234)).get();

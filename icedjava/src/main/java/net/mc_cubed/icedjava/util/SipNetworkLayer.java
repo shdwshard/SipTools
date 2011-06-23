@@ -48,7 +48,7 @@ class SipNetworkLayer implements gov.nist.core.net.NetworkLayer {
     @Override
     public DatagramSocket createDatagramSocket() throws SocketException {
         try {
-            return StunUtil.getDemultiplexerSocket(null, TransportType.UDP, null).getDatagramSocket();
+            return StunUtil.getDemultiplexerSocket(null,TransportType.UDP,false, null).getDatagramSocket();
         } catch (IOException ex) {
             throw (SocketException) new SocketException().initCause(ex);
         }
@@ -57,7 +57,7 @@ class SipNetworkLayer implements gov.nist.core.net.NetworkLayer {
     @Override
     public DatagramSocket createDatagramSocket(int port, InetAddress bindAddress) throws SocketException {
         try {
-            return StunUtil.getDemultiplexerSocket(new InetSocketAddress(bindAddress, port),TransportType.UDP, null).getDatagramSocket();
+            return StunUtil.getDemultiplexerSocket(new InetSocketAddress(bindAddress, port),TransportType.UDP,false, null).getDatagramSocket();
         } catch (IOException ex) {
             throw (SocketException) new SocketException().initCause(ex);
         }
@@ -66,7 +66,7 @@ class SipNetworkLayer implements gov.nist.core.net.NetworkLayer {
     @Override
     public ServerSocket createServerSocket(int i, int port, InetAddress bindAddress) throws IOException {
         try {
-            return StunUtil.getDemultiplexerSocket(new InetSocketAddress(bindAddress, port),TransportType.TCP, null).getServerSocket();
+            return StunUtil.getDemultiplexerSocket(new InetSocketAddress(bindAddress, port),TransportType.TCP,false, null).getServerSocket();
         } catch (IOException ex) {
             throw (SocketException) new SocketException().initCause(ex);
         }
@@ -80,7 +80,7 @@ class SipNetworkLayer implements gov.nist.core.net.NetworkLayer {
     @Override
     public Socket createSocket(InetAddress bindAddress, int port) throws IOException {
         try {
-            return StunUtil.getDemultiplexerSocket(new InetSocketAddress(bindAddress, port),TransportType.TCP, null).getSocket();
+            return StunUtil.getDemultiplexerSocket(new InetSocketAddress(bindAddress, port),TransportType.TCP,true, null).getSocket();
         } catch (IOException ex) {
             throw (SocketException) new SocketException().initCause(ex);
         }
@@ -89,7 +89,7 @@ class SipNetworkLayer implements gov.nist.core.net.NetworkLayer {
     @Override
     public Socket createSocket(InetAddress bindAddress, int port, InetAddress ia1) throws IOException {
         try {
-            return StunUtil.getDemultiplexerSocket(new InetSocketAddress(bindAddress, port),TransportType.TCP, null).getSocket();
+            return StunUtil.getDemultiplexerSocket(new InetSocketAddress(bindAddress, port),TransportType.TCP,true, null).getSocket();
         } catch (IOException ex) {
             throw (SocketException) new SocketException().initCause(ex);
         }

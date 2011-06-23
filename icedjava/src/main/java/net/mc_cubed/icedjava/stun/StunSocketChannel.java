@@ -27,8 +27,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
-import java.util.concurrent.Future;
-import net.mc_cubed.icedjava.packet.StunPacket;
 
 /**
  * Represents an StunSocketChannel which is used to send and receive data from

@@ -44,7 +44,7 @@ public class IcedRTPConnectorTest extends TestCase {
     private final InterfaceProfile DEFAULT_IF;
     public IcedRTPConnectorTest(String testName) throws UnknownHostException, IllegalArgumentException, SdpException {
         super(testName);
-        STUN_SERVER = new InetSocketAddress(StunUtil.getStunServer(),StunUtil.STUN_PORT);
+        STUN_SERVER = StunUtil.getCachedStunServerSocket();
         Vector v = new Vector();
         v.add("26");
         MEDIA = SdpFactory.getInstance().createMedia("video", 0, 2, "RTP/AVP", v);

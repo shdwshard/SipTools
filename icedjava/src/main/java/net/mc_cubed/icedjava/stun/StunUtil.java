@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.enterprise.inject.Produces;
@@ -19,8 +20,10 @@ import javax.inject.Named;
 import net.mc_cubed.icedjava.packet.StunPacket;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
+import net.mc_cubed.icedjava.stun.StreamDemultiplexerSocket.ConnectionFactory;
 import net.mc_cubed.icedjava.stun.annotation.StunServer;
 import net.mc_cubed.icedjava.stun.event.StunEventListener;
+import org.glassfish.grizzly.Connection;
 import org.glassfish.grizzly.Transport;
 import org.glassfish.grizzly.Transport.State;
 import org.glassfish.grizzly.filterchain.Filter;
@@ -198,7 +201,7 @@ public class StunUtil {
         return getStunSocket(new InetSocketAddress(address, port), stunType);
     }
 
-    public static DemultiplexerSocket getCustomStunPipeline(InetSocketAddress address, TransportType transportType, final Filter... stunFilters) throws IOException {
+    public static DemultiplexerSocket getCustomStunPipeline(InetSocketAddress address, TransportType transportType, boolean active, final Filter... stunFilters) throws IOException {
         // Create a FilterChain using FilterChainBuilder
         FilterChainBuilder filterChainBuilder = FilterChainBuilder.stateless();
 
@@ -213,10 +216,10 @@ public class StunUtil {
             // If we're a TCP socket, we MUST support RFC 4571 framing!
             filterChainBuilder.add(new RFC4571FramingFilter());
         }
-        
+
         // Add the STUN packet decoder
         filterChainBuilder.add(new StunPacketProtocolFilter());
-        
+
         // Add the custom filters
         for (Filter stunFilter : stunFilters) {
             filterChainBuilder.add(stunFilter);
@@ -227,8 +230,8 @@ public class StunUtil {
         if (transportType == transportType.UDP) {
             // Finally, add the stunSocket class to the top of the chain
             socket = new DatagramDemultiplexerSocket(null);
-            filterChainBuilder.add((Filter)socket);
-            
+            filterChainBuilder.add((Filter) socket);
+
             // Get the underlying datagram transport
             UDPNIOTransport transport = getDatagramTransport();
 
@@ -239,54 +242,107 @@ public class StunUtil {
             connection.setProcessor(filterChainBuilder.build());
 
             // Set the server connection
-            ((DatagramStunSocket)socket).setServerConnection(connection);
+            ((DatagramStunSocket) socket).setServerConnection(connection);
         } else {
-            // Finally, add the stunSocket class to the top of the chain
-            socket = new StreamDemultiplexerSocket(null);
-            filterChainBuilder.add((Filter)socket);
+            if (active) {
+                ConnectionFactory factory = new ConnectionFactory() {
 
-            // Get the underlying stream transport
-            TCPNIOTransport transport = getServerSocketChannelFactory();
+                    @Override
+                    public Connection connect(InetSocketAddress address, Filter socket) {
+                        try {
+                            // Create a FilterChain using FilterChainBuilder
+                            FilterChainBuilder filterChainBuilder = FilterChainBuilder.stateless();
 
-            // Bind the socket to the supplied address
-            TCPNIOServerConnection connection = transport.bind(address);
+                            // Add TransportFilter, which is responsible for reading and writing 
+                            //  data to the connection
+                            filterChainBuilder.add(new TransportFilter());
 
-            // Add the filter chain
-            connection.setProcessor(filterChainBuilder.build());
+                            // Add the transcoding filter to go from Grizzly Buffers to NIO buffers
+                            filterChainBuilder.add(new ByteBufferGrizzlyProtocolFilter());
 
-            // Set the server connection
-            ((StreamDemultiplexerSocket)socket).setServerConnection(connection);
+                            // If we're a TCP socket, we MUST support RFC 4571 framing!
+                            filterChainBuilder.add(new RFC4571FramingFilter());
+
+                            // Add the STUN packet decoder
+                            filterChainBuilder.add(new StunPacketProtocolFilter());
+
+                            // Add the custom filters
+                            for (Filter stunFilter : stunFilters) {
+                                filterChainBuilder.add(stunFilter);
+                            }
+                            filterChainBuilder.add((Filter) socket);
+
+                            // Get the underlying stream transport
+                            TCPNIOTransport transport = getServerSocketChannelFactory();
+
+                            // Bind the socket to the supplied address
+                            Connection connection = transport.connect(address).get();
+
+                            // Add the filter chain
+                            connection.setProcessor(filterChainBuilder.build());
+
+                            return connection;
+                        } catch (InterruptedException ex) {
+                            Logger.getLogger(StunUtil.class.getName()).log(Level.SEVERE, null, ex);
+                        } catch (ExecutionException ex) {
+                            Logger.getLogger(StunUtil.class.getName()).log(Level.SEVERE, null, ex);
+                        } catch (IOException ex) {
+                            Logger.getLogger(StunUtil.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                        return null;
+                    }
+                };
+
+                socket = new StreamDemultiplexerSocket(null, factory);
+
+            } else {
+                socket = new StreamDemultiplexerServerSocket(null);
+
+                filterChainBuilder.add((Filter) socket);
+
+                // Get the underlying stream transport
+                TCPNIOTransport transport = getServerSocketChannelFactory();
+
+                // Bind the socket to the supplied address
+                TCPNIOServerConnection connection = transport.bind(address);
+
+                // Add the filter chain
+                connection.setProcessor(filterChainBuilder.build());
+
+                // Set the server connection
+                ((StreamDemultiplexerSocket) socket).setServerConnection(connection);
+            }
 
         }
 
         return socket;
     }
 
-    public static DemultiplexerSocket getCustomStunPipeline(int port, TransportType transportType,final Filter... stunFilters) throws IOException {
-        return getCustomStunPipeline(new InetSocketAddress(port), transportType,stunFilters);
+    public static DemultiplexerSocket getCustomStunPipeline(int port, final Filter... stunFilters) throws IOException {
+        return getCustomStunPipeline(new InetSocketAddress(port), TransportType.UDP, false, stunFilters);
     }
 
-    public static DemultiplexerSocket getCustomStunPipeline(InetAddress address, int port,TransportType transportType, final Filter... stunFilters) throws IOException {
-        return getCustomStunPipeline(new InetSocketAddress(address, port), transportType,stunFilters);
+    public static DemultiplexerSocket getCustomStunPipeline(InetAddress address, int port, final Filter... stunFilters) throws IOException {
+        return getCustomStunPipeline(new InetSocketAddress(address, port), TransportType.UDP, false, stunFilters);
     }
 
-    public static DemultiplexerSocket getCustomStunPipeline(TransportType transportType,final Filter... stunFilters) throws IOException {
-        return getCustomStunPipeline(new InetSocketAddress(0),transportType, stunFilters);
+    public static DemultiplexerSocket getCustomStunPipeline(final Filter... stunFilters) throws IOException {
+        return getCustomStunPipeline(new InetSocketAddress(0), TransportType.UDP, false, stunFilters);
     }
 
-    public static DemultiplexerSocket getDemultiplexerSocket(InetAddress address,TransportType transportType, int port) throws IOException {
-        return getDemultiplexerSocket(new InetSocketAddress(address, port), transportType,null);
+    public static DemultiplexerSocket getDemultiplexerSocket(InetAddress address, int port) throws IOException {
+        return getDemultiplexerSocket(new InetSocketAddress(address, port), TransportType.UDP, false, null);
     }
 
-    public static DemultiplexerSocket getDemultiplexerSocket(int port,TransportType transportType) throws IOException {
-        return getDemultiplexerSocket(new InetSocketAddress(port), transportType,null);
+    public static DemultiplexerSocket getDemultiplexerSocket(int port) throws IOException {
+        return getDemultiplexerSocket(new InetSocketAddress(port), TransportType.UDP, false, null);
     }
 
-    public static DemultiplexerSocket getDemultiplexerSocket(TransportType transportType) throws IOException {
-        return getDemultiplexerSocket((InetSocketAddress) null, transportType,null);
+    public static DemultiplexerSocket getDemultiplexerSocket() throws IOException {
+        return getDemultiplexerSocket((InetSocketAddress) null, TransportType.UDP, false, null);
     }
 
-    public static DemultiplexerSocket getDemultiplexerSocket(InetSocketAddress inetSocketAddress,TransportType transportType, final StunEventListener stunEventListener) throws IOException {
+    public static DemultiplexerSocket getDemultiplexerSocket(InetSocketAddress inetSocketAddress, TransportType transportType, boolean active, final StunEventListener stunEventListener) throws IOException {
         // Create a FilterChain using FilterChainBuilder
         FilterChainBuilder filterChainBuilder = FilterChainBuilder.stateless();
 
@@ -296,6 +352,11 @@ public class StunUtil {
 
         // Add the transcoding filter to go from Grizzly Buffers to NIO buffers
         filterChainBuilder.add(new ByteBufferGrizzlyProtocolFilter());
+
+        if (transportType == transportType.TCP) {
+            // If we're a TCP socket, we MUST support RFC 4571 framing!
+            filterChainBuilder.add(new RFC4571FramingFilter());
+        }
 
         // Add the packet encoding/decoding filter which does the format
         //  translation for STUN packets
@@ -310,8 +371,8 @@ public class StunUtil {
         if (transportType == transportType.UDP) {
             // Finally, add the stunSocket class to the top of the chain
             socket = new DatagramDemultiplexerSocket(null);
-            filterChainBuilder.add((Filter)socket);
-            
+            filterChainBuilder.add((Filter) socket);
+
             // Get the underlying datagram transport
             UDPNIOTransport transport = getDatagramTransport();
 
@@ -322,26 +383,76 @@ public class StunUtil {
             connection.setProcessor(filterChainBuilder.build());
 
             // Set the server connection
-            ((DatagramStunSocket)socket).setServerConnection(connection);
+            ((DatagramStunSocket) socket).setServerConnection(connection);
         } else {
-            // Finally, add the stunSocket class to the top of the chain
-            socket = new StreamDemultiplexerSocket(null);
-            filterChainBuilder.add((Filter)socket);
+            if (active) {
+                ConnectionFactory factory = new ConnectionFactory() {
 
-            // Get the underlying stream transport
-            TCPNIOTransport transport = getServerSocketChannelFactory();
+                    @Override
+                    public Connection connect(InetSocketAddress address, Filter socket) {
+                        try {
+                            // Create a FilterChain using FilterChainBuilder
+                            FilterChainBuilder filterChainBuilder = FilterChainBuilder.stateless();
 
-            // Bind the socket to the supplied address
-            TCPNIOServerConnection connection = transport.bind(inetSocketAddress);
+                            // Add TransportFilter, which is responsible for reading and writing 
+                            //  data to the connection
+                            filterChainBuilder.add(new TransportFilter());
 
-            // Add the filter chain
-            connection.setProcessor(filterChainBuilder.build());
+                            // Add the transcoding filter to go from Grizzly Buffers to NIO buffers
+                            filterChainBuilder.add(new ByteBufferGrizzlyProtocolFilter());
 
-            // Set the server connection
-            ((StreamDemultiplexerSocket)socket).setServerConnection(connection);
+                            // If we're a TCP socket, we MUST support RFC 4571 framing!
+                            filterChainBuilder.add(new RFC4571FramingFilter());
 
+                            // Add the STUN packet decoder
+                            filterChainBuilder.add(new StunPacketProtocolFilter());
+
+                            // This socket should respond to STUN packets, so add the default stun
+                            //  handler
+                            filterChainBuilder.add(new DefaultStunServerHandler());
+
+                            filterChainBuilder.add((Filter) socket);
+
+                            // Get the underlying stream transport
+                            TCPNIOTransport transport = getServerSocketChannelFactory();
+
+                            // Bind the socket to the supplied address
+                            Connection connection = transport.connect(address).get();
+
+                            // Add the filter chain
+                            connection.setProcessor(filterChainBuilder.build());
+
+                            return connection;
+                        } catch (InterruptedException ex) {
+                            Logger.getLogger(StunUtil.class.getName()).log(Level.SEVERE, null, ex);
+                        } catch (ExecutionException ex) {
+                            Logger.getLogger(StunUtil.class.getName()).log(Level.SEVERE, null, ex);
+                        } catch (IOException ex) {
+                            Logger.getLogger(StunUtil.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                        return null;
+                    }
+                };
+
+                socket = new StreamDemultiplexerSocket(null, factory);
+            } else {
+                socket = new StreamDemultiplexerServerSocket(null);
+
+                filterChainBuilder.add((Filter) socket);
+
+                // Get the underlying stream transport
+                TCPNIOTransport transport = getServerSocketChannelFactory();
+
+                // Bind the socket to the supplied address
+                TCPNIOServerConnection connection = transport.bind(inetSocketAddress);
+
+                // Add the filter chain
+                connection.setProcessor(filterChainBuilder.build());
+
+                // Set the server connection
+                ((StreamDemultiplexerSocket) socket).setServerConnection(connection);
+            }
         }
-        
         return socket;
     }
 

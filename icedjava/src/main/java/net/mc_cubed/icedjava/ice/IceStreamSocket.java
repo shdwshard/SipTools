@@ -31,6 +31,7 @@ import javax.sdp.Media;
 import javax.sdp.SdpException;
 import javax.sdp.SdpParseException;
 import net.mc_cubed.icedjava.stun.StunUtil;
+import net.mc_cubed.icedjava.stun.TCPSocketType;
 import net.mc_cubed.icedjava.stun.TransportType;
 import net.mc_cubed.icedjava.util.ExpiringCache;
 
@@ -55,7 +56,8 @@ class IceStreamSocket implements IceSocket {
     protected Media media;
     public static final String PROP_MEDIA = "media";
     ExpiringCache<SocketAddress, IcePeer> socketCache = new ExpiringCache<SocketAddress, IcePeer>();
-
+    TCPSocketType tcpSocketType;
+       
     protected IceStreamSocket(Media media) {
         this(StunUtil.getCachedStunServerSocket(),media);
         
@@ -127,4 +129,10 @@ class IceStreamSocket implements IceSocket {
         return TransportType.TCP;
     }
 
+    @Override
+    public TCPSocketType getTcpSocketType() {
+        return tcpSocketType;
+    }
+
+    
 }

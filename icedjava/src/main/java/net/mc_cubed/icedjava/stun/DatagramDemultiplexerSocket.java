@@ -200,6 +200,11 @@ class DatagramDemultiplexerSocket extends DatagramStunSocket implements Demultip
         throw new UnsupportedOperationException("Datagram Socket does not support this operation");
     }
 
+    @Override
+    public TCPSocketType getTcpSocketType() {
+        throw new UnsupportedOperationException("Not valid for a datagram socket.");
+    }
+
     /**
      * A dummy DatagramSocket implementation used to allow OIO dependant code to
      * leverage ICE without major code rewriting.

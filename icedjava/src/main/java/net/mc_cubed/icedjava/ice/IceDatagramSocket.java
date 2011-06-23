@@ -37,6 +37,7 @@ import javax.sdp.MediaDescription;
 import javax.sdp.SdpFactory;
 import javax.sdp.SdpParseException;
 import net.mc_cubed.icedjava.stun.StunUtil;
+import net.mc_cubed.icedjava.stun.TCPSocketType;
 import net.mc_cubed.icedjava.stun.TransportType;
 import net.mc_cubed.icedjava.util.ExpiringCache;
 import org.glassfish.grizzly.filterchain.BaseFilter;
@@ -256,5 +257,10 @@ public class IceDatagramSocket extends BaseFilter implements IceSocket {
     @Override
     public TransportType getTransport() {
         return TransportType.UDP;
+    }
+
+    @Override
+    public TCPSocketType getTcpSocketType() {
+        throw new UnsupportedOperationException("Not valid for a datagram socket.");
     }
 }

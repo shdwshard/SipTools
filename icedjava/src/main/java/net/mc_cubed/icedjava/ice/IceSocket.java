@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.Collection;
 import javax.sdp.Media;
 import javax.sdp.SdpException;
+import net.mc_cubed.icedjava.stun.TCPSocketType;
 import net.mc_cubed.icedjava.stun.TransportType;
 
 /**
@@ -76,5 +77,7 @@ public interface IceSocket {
     public void close() throws IOException;
     
     public TransportType getTransport();
+    
+    public TCPSocketType getTcpSocketType();
 
 }

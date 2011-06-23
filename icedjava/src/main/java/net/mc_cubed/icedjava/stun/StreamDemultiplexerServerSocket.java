@@ -50,7 +50,6 @@ import net.mc_cubed.icedjava.util.AddressedByteBuffer;
 import net.mc_cubed.icedjava.util.ExpiringCache;
 import org.glassfish.grizzly.Connection;
 import org.glassfish.grizzly.filterchain.BaseFilter;
-import org.glassfish.grizzly.filterchain.Filter;
 import org.glassfish.grizzly.filterchain.FilterChain;
 import org.glassfish.grizzly.filterchain.FilterChainContext;
 import org.glassfish.grizzly.filterchain.NextAction;
@@ -63,7 +62,7 @@ import org.glassfish.grizzly.filterchain.NextAction;
  * @author Charles Chappell
  * @since 0.9
  */
-class StreamDemultiplexerSocket extends BaseFilter implements DemultiplexerSocket, StunSocketChannel {
+class StreamDemultiplexerServerSocket extends BaseFilter implements DemultiplexerSocket, StunSocketChannel {
 
     protected static Logger log = Logger.getLogger(DatagramStunSocket.class.getName());
     static ExpiringCache<BigInteger, StunReplyFuture> requestCache = new ExpiringCache<BigInteger, StunReplyFuture>();
@@ -76,18 +75,12 @@ class StreamDemultiplexerSocket extends BaseFilter implements DemultiplexerSocke
     Event<StunEvent> eventBroadcaster;
     private ServerStreamStunSocketBridge serverSocketBridge;
     private StreamStunSocketBridge socketBridge;
-    private final ConnectionFactory connectionFactory;
-    
-    protected interface ConnectionFactory {
-        Connection connect(InetSocketAddress address,Filter socket);
-    }
-    
-    protected StreamDemultiplexerSocket(StunEventListener stunEventListener,ConnectionFactory factory) {
+
+    protected StreamDemultiplexerServerSocket(StunEventListener stunEventListener) {
         if (stunEventListener != null) {
             listeners.add(stunEventListener);
         }
-        this.connectionFactory = factory;
-        tcpSocketType = TCPSocketType.ACTIVE;
+        tcpSocketType = TCPSocketType.PASSIVE;
     }
 
     @Override

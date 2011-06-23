@@ -27,6 +27,7 @@ import javax.sdp.Attribute;
 import javax.sdp.MediaDescription;
 import javax.sdp.SdpException;
 import javax.sdp.SessionDescription;
+import org.glassfish.grizzly.filterchain.Filter;
 
 /**
  * The public interface representing a Peer in ICE. This is the most actively
@@ -35,7 +36,7 @@ import javax.sdp.SessionDescription;
  * @author Charles Chappell
  * @since 0.9
  */
-public interface IcePeer extends SDPListener {
+public interface IcePeer extends SDPListener,Filter {
 
     SessionDescription createOffer() throws SdpException;
 
