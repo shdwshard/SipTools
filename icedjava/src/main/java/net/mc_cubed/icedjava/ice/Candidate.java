@@ -70,8 +70,8 @@ public abstract class Candidate {
             case UDP:
                 return getFoundation() + " " + getComponentId() + " " + getTransport() + " " + getPriority()
                         + " " + getAddress().getHostAddress() + " " + getPort() + " typ " + getType().netVal()
-                        + ((getType() != getType().LOCAL) ? " " + getBaseAddress().getHostAddress()
-                        + " " + getBasePort() : "");
+                        + ((getType() != getType().LOCAL) ? " raddr " + getBaseAddress().getHostAddress()
+                        + " rport " + getBasePort() : "");
             case TCP:
                 return getFoundation() + " " + getComponentId() + " " + getTransport() + " " + getPriority()
                         + " " + getAddress().getHostAddress() + " " + getPort() + " typ " + getType().netVal()
