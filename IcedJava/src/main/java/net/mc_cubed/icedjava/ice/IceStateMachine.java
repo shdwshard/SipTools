@@ -42,6 +42,7 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.StringTokenizer;
 import java.util.Vector;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -78,7 +79,6 @@ import net.mc_cubed.icedjava.packet.header.MessageMethod;
 import net.mc_cubed.icedjava.stun.StunReply;
 import net.mc_cubed.icedjava.stun.StunUtil;
 import net.mc_cubed.icedjava.stun.TransportType;
-import net.mc_cubed.icedjava.util.ExpiringCache;
 import org.glassfish.grizzly.filterchain.BaseFilter;
 import org.glassfish.grizzly.filterchain.FilterChainContext;
 import org.glassfish.grizzly.filterchain.NextAction;
@@ -113,8 +113,10 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     private int iceInterval = 500;
     private ScheduledFuture task = null;
     private long lastSent = 0;
-    private boolean sdpTimeout = true;
+    //private boolean sdpTimeout = true;
     private long refreshDelay = 15000; // 15 seconds
+    private long sdpTimeoutTime = 15000;
+    private long lastTouch = 0;
     private NominationType nomination = NominationType.REGULAR;
     private boolean restartFlag = false;
     private IceStatus iceStatus = IceStatus.NOT_STARTED;
@@ -130,7 +132,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     private final Map<IceSocket, Media> mediaCandidates = new LinkedHashMap<IceSocket, Media>();
     private final Queue<CandidatePair> triggeredCheckQueue = new LinkedList<CandidatePair>();
     //private final Queue<SessionDescription> offers = new ConcurrentLinkedQueue<SessionDescription>();
-    protected final Map<IceSocket, List<CandidatePair>> checkPairs = new HashMap<IceSocket, List<CandidatePair>>();
+    protected final Map<IceSocket, List<CandidatePair>> checkPairs = new ConcurrentHashMap<IceSocket, List<CandidatePair>>();
     //private final Map<CandidateType, Integer> priorities = new HashMap<CandidateType, Integer>();
     private final Map<IceSocket, List<LocalCandidate>> socketCandidateMap = new LinkedHashMap<IceSocket, List<LocalCandidate>>();
     //private Timer checktimer;
@@ -147,7 +149,6 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     Instance<CandidateDiscovery> localCandidateDiscoveryMechs;
     boolean localOnly = false;
     boolean sendKeepalives = false;
-    ExpiringCache<SocketAddress, IcePeer> socketCache = new ExpiringCache<SocketAddress, IcePeer>();
 
     @Override
     protected void finalize() throws Throwable {
@@ -188,7 +189,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         this.nomination = nomination;
 
         if (getStatus() != IceStatus.NOT_STARTED) {
-            doReset(this.isLocalControlled());
+            doReset(isLocalControlled(), true);
         }
     }
 
@@ -323,6 +324,20 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         }
     }
 
+    public void sendSessionUpdate() throws SdpException {
+        lastSent = new Date().getTime();
+
+        List<Attribute> iceAttributes = getGlobalAttributes();
+        List<MediaDescription> iceMedias = getMediaDescriptions();
+        Connection conn = getDefaultConnection();
+
+        setSdpTimeout(false);
+
+        if (sdpListener != null) {
+            sdpListener.updateMedia(conn, iceAttributes, iceMedias);
+        }
+    }
+
     /*
      * This method implements the ICE State machine.  It is called periodically
      */
@@ -355,15 +370,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                     try {
                         // This prevents packet storms
                         if (isSdpTimeout()) {
-                            lastSent = new Date().getTime();
-
-                            List<Attribute> iceAttributes = getGlobalAttributes();
-                            List<MediaDescription> iceMedias = getMediaDescriptions();
-                            Connection conn = getDefaultConnection();
-
-                            setSdpTimeout(false);
-
-                            sdpListener.updateMedia(conn, iceAttributes, iceMedias);
+                            sendSessionUpdate();
                         }
                     } catch (SdpException ex) {
                         log.log(Level.SEVERE, null, ex);
@@ -373,6 +380,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                 // Do we have a remote uFrag and Password?
                 if (remoteUFrag == null || remotePassword == null || checkPairs == null) {
                     log.log(Level.INFO, "{0} waiting on peer for offer in {1} role.", new Object[]{getPeerId(), localRole});
+                    checkStatus();
                 } else {
                     // Check ICE status
                     checkStatus();
@@ -460,11 +468,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                                             successPairs.add(cp);
                                         }
                                     }
-                                    if (successPairs.isEmpty()) {
-                                        if (localRole == AgentRole.CONTROLLING) {
-                                            doReset(isLocalControlled());
-                                        }
-                                    } else {
+                                    if (!successPairs.isEmpty()) {
                                         Map<Short, List<CandidatePair>> separatedCandidates = separateByComponent(successPairs);
 
                                         for (List<CandidatePair> nominateOne : separatedCandidates.values()) {
@@ -492,12 +496,19 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                             }
                             iceStatus = IceStatus.SUCCESS;
                             checkStatus();
+
                             if (iceStatus == IceStatus.SUCCESS) {
                                 try {
-                                    sdpListener.sendSession(createOffer());
+                                    sendSessionUpdate();
                                 } catch (SdpException ex) {
                                     log.log(Level.SEVERE, null, ex);
                                 }
+                            } else {
+                                if (isLocalControlled()) {
+                                    doReset(isLocalControlled(), true);
+                                    return;
+                                }
+
                             }
                         }
                     }
@@ -796,9 +807,9 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                 }
             }
         } catch (InterruptedException ex) {
-            Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, "Caught Interrupted Exception during an ICE/STUN test", ex);
         } catch (ExecutionException ex) {
-            Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, "Caught Execution Exception during an ICE/STUN test", ex);
         } finally {
             // Ensure there won't be any pairs still in progress after this function ends
             if (pair.getState() == PairState.IN_PROGRESS) {
@@ -813,7 +824,9 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     public synchronized void start() {
         if (task == null || task.isDone() == true) {
             iceStatus = IceStatus.IN_PROGRESS;
-            task = getThreadpool().scheduleAtFixedRate(this, 0, iceInterval, TimeUnit.MILLISECONDS);
+            // Do first run now
+            run();
+            task = getThreadpool().scheduleAtFixedRate(this, iceInterval, iceInterval, TimeUnit.MILLISECONDS);
         }
     }
 
@@ -852,7 +865,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      */
     @Override
     public boolean isSdpTimeout() {
-        return sdpTimeout;
+        return (new Date().getTime() - lastTouch > sdpTimeoutTime);
     }
 
     /**
@@ -860,10 +873,8 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      */
     @Override
     public void setSdpTimeout(boolean sdpTimeout) {
-        this.sdpTimeout = sdpTimeout;
+        lastTouch = sdpTimeout ? 0: new Date().getTime();
     }
-
-    protected abstract Map<String, IcePeer> getPeerMap();
 
     @Override
     public NextAction handleRead(FilterChainContext ctx) throws IOException {
@@ -928,10 +939,8 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
         String localUfrag = st.nextToken();
 
-        IcePeer fromPeer = getPeerMap().get(localUfrag);
-
-        if (fromPeer == null) {
-            log.log(Level.WARNING, "From a nonexistent peer: {0}", localUfrag);
+        if (localUfrag.compareTo(this.localUFrag) != 0) {
+            log.log(Level.WARNING, "From a nonexistent peer: {0}", st.nextToken());
             return false;
         }
 
@@ -967,31 +976,31 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             return false;
         }
 
-        if (fromPeer.isLocalControlled() ^ localControl
+        if (isLocalControlled() ^ localControl
                 && packet.getMessageClass() == MessageClass.REQUEST
                 && remoteTieBreaker != 0) {
             log.warning("AgentType Mismatch");
 
             // Determine who switches roles
-            if ((fromPeer.isLocalControlled()
-                    && fromPeer.getTieBreaker() >= remoteTieBreaker)
-                    || (!fromPeer.isLocalControlled()
-                    && fromPeer.getTieBreaker() < remoteTieBreaker)) {
+            if ((isLocalControlled()
+                    && getTieBreaker() >= remoteTieBreaker)
+                    || (!isLocalControlled()
+                    && getTieBreaker() < remoteTieBreaker)) {
 
                 StunPacket response = StunUtil.createReplyPacket(packet, MessageClass.ERROR);
                 response.getAttributes().add(AttributeFactory.createErrorCodeAttribute(ROLE_CONFLICT, ROLE_CONFLICT_REASON));
-                if (fromPeer.isLocalControlled()) {
-                    response.getAttributes().add(AttributeFactory.createIceControllingAttribute(fromPeer.getTieBreaker()));
+                if (isLocalControlled()) {
+                    response.getAttributes().add(AttributeFactory.createIceControllingAttribute(getTieBreaker()));
                 } else {
-                    response.getAttributes().add(AttributeFactory.createIceControlledAttribute(fromPeer.getTieBreaker()));
+                    response.getAttributes().add(AttributeFactory.createIceControlledAttribute(getTieBreaker()));
                 }
                 // Authentication Attributes
-                if (fromPeer.getRemotePassword() != null && fromPeer.getRemoteUFrag() != null) {
+                if (getRemotePassword() != null && getRemoteUFrag() != null) {
                     String realm = "icedjava";
-                    String username = fromPeer.getRemoteUFrag() + ":" + fromPeer.getLocalUFrag();
+                    String username = getRemoteUFrag() + ":" + getLocalUFrag();
                     response.getAttributes().add(AttributeFactory.createUsernameAttribute(username));
                     response.getAttributes().add(AttributeFactory.createRealmAttribute(realm));
-                    response.getAttributes().add(AttributeFactory.createIntegrityAttribute(username, realm, fromPeer.getRemotePassword()));
+                    response.getAttributes().add(AttributeFactory.createIntegrityAttribute(username, realm, getRemotePassword()));
                 }
                 response.getAttributes().add(AttributeFactory.createFingerprintAttribute());
 
@@ -1003,18 +1012,18 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
             // Flip the local role and continue (no error)
             log.warning("Local role switching");
-            fromPeer.setLocalControlled(!fromPeer.isLocalControlled());
+            setLocalControlled(!isLocalControlled());
 
         }
 
-        // Check whether this is a nomination request
-        if (attrMap.containsKey(AttributeType.USE_CANDIDATE)) {
+        // Check whether this is a nomination request, and we're the controlled peer
+        if (attrMap.containsKey(AttributeType.USE_CANDIDATE) && !isLocalControlled()) {
             // Nominate this candidate with the peer
-            ((IcePeerImpl) fromPeer).setUseCandidate(
+            setUseCandidate(
                     (InetSocketAddress) ctx.getConnection().getLocalAddress(),
                     (InetSocketAddress) sourceAddress);
         }
-        ((IceStateMachine) fromPeer).remoteTouch(
+        remoteTouch(
                 (InetSocketAddress) ctx.getConnection().getLocalAddress(),
                 (InetSocketAddress) sourceAddress);
         // We should reply
@@ -1026,18 +1035,18 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                         ((InetSocketAddress) sourceAddress).getPort(),
                         packet.getTransactionId()));
 
-                if (fromPeer.isLocalControlled()) {
-                    response.getAttributes().add(AttributeFactory.createIceControllingAttribute(fromPeer.getTieBreaker()));
+                if (isLocalControlled()) {
+                    response.getAttributes().add(AttributeFactory.createIceControllingAttribute(getTieBreaker()));
                 } else {
-                    response.getAttributes().add(AttributeFactory.createIceControlledAttribute(fromPeer.getTieBreaker()));
+                    response.getAttributes().add(AttributeFactory.createIceControlledAttribute(getTieBreaker()));
                 }
                 // Authentication Attributes
-                if (fromPeer.getRemotePassword() != null && fromPeer.getRemoteUFrag() != null) {
+                if (getRemotePassword() != null && getRemoteUFrag() != null) {
                     String realm = "icedjava";
-                    String username = fromPeer.getRemoteUFrag() + ":" + fromPeer.getLocalUFrag();
+                    String username = getRemoteUFrag() + ":" + getLocalUFrag();
                     response.getAttributes().add(AttributeFactory.createUsernameAttribute(username));
                     response.getAttributes().add(AttributeFactory.createRealmAttribute(realm));
-                    response.getAttributes().add(AttributeFactory.createIntegrityAttribute(username, realm, fromPeer.getRemotePassword()));
+                    response.getAttributes().add(AttributeFactory.createIntegrityAttribute(username, realm, getRemotePassword()));
                 }
                 response.getAttributes().add(AttributeFactory.createFingerprintAttribute());
 
@@ -1196,6 +1205,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
             }
         }
+        lastTouch = new Date().getTime();
     }
 
     /**
@@ -1260,37 +1270,9 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             }
             iceStatus = status;
 
-            /*if (iceStatus == IceStatus.FAILED && isLocalControlled()) {
-                doReset(true);
-            }*/
 
         }
 
-    }
-
-    /**
-     * Separates the attributes of the session and delegates to updateMedia
-     *
-     * @param session SDP Session to extract ICE information from
-     * @throws SdpException
-     * @deprecated Use updateMedia instead
-     */
-    @Override
-    @Deprecated
-    final public void sendSession(SessionDescription session) throws SdpException {
-
-        List<Attribute> iceAttributes = new LinkedList<Attribute>();
-        for (Attribute attr : (Vector<Attribute>) session.getAttributes(icelite)) {
-            if (attr.getName().equalsIgnoreCase(IceStateMachine.SDP_ICE_LITE)
-                    || attr.getName().equalsIgnoreCase(IceStateMachine.SDP_UFRAG)
-                    || attr.getName().equalsIgnoreCase(IceStateMachine.SDP_PWD)) {
-                iceAttributes.add(attr);
-            }
-        }
-        List<MediaDescription> mediaDescriptions = new LinkedList<MediaDescription>();
-        mediaDescriptions.addAll((Vector<MediaDescription>) session.getMediaDescriptions(false));
-
-        updateMedia(session.getConnection(), iceAttributes, mediaDescriptions);
     }
 
     /**
@@ -1349,7 +1331,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             throws SdpParseException, SdpException, UnknownHostException {
 
         boolean uFragChanged = false, pwdChanged = false;
-
+        String newRemoteUFrag = null, newRemotePassword = null;
         /**
          * 9.1.1.1.  ICE Restarts
          *
@@ -1376,7 +1358,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                     if (remoteUFrag != null) {
                         uFragChanged = true;
                     }
-                    setRemoteUFrag(attr.getValue());
+                    newRemoteUFrag = attr.getValue();
                 }
             } else if (attr.getName().equalsIgnoreCase(SDP_PWD)) {
                 if (remotePassword == null || !remotePassword.equalsIgnoreCase(attr.getValue())) {
@@ -1384,7 +1366,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                     if (remotePassword != null) {
                         pwdChanged = true;
                     }
-                    setRemotePassword(attr.getValue());
+                    newRemotePassword = attr.getValue();
                 }
             }
         }
@@ -1403,10 +1385,20 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             restartFlag = true;
         }
 
+
         Map<MediaDescription, List<RemoteCandidate>> remoteMediaMap = extractRemoteCandidates(conn, iceMedias);
 
-        if (restartFlag && !isLocalControlled()) {
-            doReset(isLocalControlled());
+        if (restartFlag) {
+            doReset(isLocalControlled(), false);
+        }
+
+        // These need to survive the restart
+        if (newRemoteUFrag != null) {
+            setRemoteUFrag(newRemoteUFrag);
+        }
+
+        if (newRemotePassword != null) {
+            setRemotePassword(newRemotePassword);
         }
 
         for (IceSocket socket : iceSockets) {
@@ -1426,14 +1418,11 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         if (localRole == AgentRole.CONTROLLED) {
             try {
                 // Send a reply to the controller
-                //sdpListener.sendSession(createOffer());
-                sdpListener.updateMedia(this.getDefaultConnection(), this.getGlobalAttributes(), this.getMediaDescriptions());
+                sendSessionUpdate();
             } catch (SdpException ex) {
                 log.log(Level.SEVERE, null, ex);
             }
         }
-
-        //iceStatus = IceStatus.IN_PROGRESS;
 
     }
 
@@ -1571,6 +1560,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                     for (CandidatePair pair : pairs) {
                         // Reset their local control flag
                         pair.setLocalControlled(localControl);
+                        pair.setState(PairState.FROZEN);
                     }
                     // Re-sort candidates
                     Collections.sort(pairs, new CandidatePairComparison());
@@ -1586,11 +1576,15 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
             // Reset the overall ICE Status
             iceStatus = IceStatus.IN_PROGRESS;
-
-            try {
-                sdpListener.updateMedia(getDefaultConnection(), getGlobalAttributes(), getMediaDescriptions());
-            } catch (SdpException ex) {
-                log.log(Level.SEVERE, "Exception generating session for peer during restart.", ex);
+            
+            if (!localControl) {
+                try {
+                    // Need to emit an SDP reply, as we thought we were the
+                    // controller before, and so never replied
+                    sendSessionUpdate();
+                } catch (SdpException ex) {
+                    Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
         }
     }
@@ -2216,29 +2210,6 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         return retval;
     }
 
-    @Deprecated
-    IcePeer translateSocketAddressToPeer(SocketAddress address, IceSocket socket, short componentId) {
-        if (socketCache.containsKey(address)) {
-            return socketCache.get(address);
-        } else {
-            IcePeer peer = null;
-            for (IcePeer checkPeer : getPeerMap().values()) {
-                if (checkPeer.getNominated().get(socket) != null
-                        && checkPeer.getNominated().get(socket).size() > componentId) {
-                    CandidatePair pair = checkPeer.getNominated().get(socket).get(componentId);
-                    if (pair.getRemoteCandidate().getSocketAddress().equals(address)) {
-                        peer = checkPeer;
-                        break;
-                    }
-                }
-            }
-            if (peer != null) {
-                socketCache.admit(address, peer);
-            }
-            return peer;
-        }
-    }
-
     public enum AgentRole {
 
         CONTROLLING, CONTROLLED
@@ -2383,44 +2354,43 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         iceSockets.clear();
         mediaCandidates.clear();
         nominated.clear();
-        socketCache.clear();
         triggeredCheckQueue.clear();
     }
 
     @Override
-    public synchronized void doReset(final boolean localControl) {
-        // Stop all running tasks
-        //task.cancel(false);
+    public void doReset(final boolean localControl) {
+        doReset(localControl, true);
+    }
 
-        // Reset the state
-        if (localControl) {
-            remoteUFrag = null;
-            remotePassword = null;
+    public synchronized void doReset(final boolean localControl, boolean resetPeer) {
 
+        log.log(Level.WARNING, "{0} peer reset, type {1}", new Object[]{getPeerId(), resetPeer ? "hard" : "soft"});
 
-        }
+        remoteUFrag = null;
+        remotePassword = null;
+
         iceStatus = IceStatus.IN_PROGRESS;
         checkPairs.clear();
         triggeredCheckQueue.clear();
-        localUFrag = generateHashString(UFRAG_LENGTH);
-        localPassword = generateHashString(PASSWORD_LENGTH);
+        if (resetPeer) {
+            localUFrag = generateHashString(UFRAG_LENGTH);
+            localPassword = generateHashString(PASSWORD_LENGTH);
+        }
         nominated.clear();
-
-        setSdpTimeout(true);
-
 
         for (IceSocket socket : iceSockets) {
             getLocalCandidates(socket, true);
         }
 
-        //sdpListener.sendSession(createOffer());
+        setLocalControlled(localControl);
 
-        localRole = localControl ? AgentRole.CONTROLLING : AgentRole.CONTROLLED;
-
-        // Restart ICE processing
-        //task = null;
-        //start();
-
+        if (isLocalControlled()) {
+            try {
+                sendSessionUpdate();
+            } catch (SdpException ex) {
+                log.log(Level.SEVERE, "Exception generating session for peer during restart.", ex);
+            }
+        }
 
     }
 

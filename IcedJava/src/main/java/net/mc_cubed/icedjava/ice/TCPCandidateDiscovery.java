@@ -45,53 +45,57 @@ public class TCPCandidateDiscovery implements CandidateDiscovery {
     @Override
     public List<LocalCandidate> discoverCandidates(IcePeer peer, IceSocket iceSocket) {
         List<LocalCandidate> retval = new LinkedList<LocalCandidate>();
-        for (int componentId = 0; componentId < iceSocket.getComponents(); componentId++) {
-            try {
-                Enumeration<NetworkInterface> ifaces =
-                        NetworkInterface.getNetworkInterfaces();
-                while (ifaces.hasMoreElements()) {
-                    NetworkInterface iface = ifaces.nextElement();
 
-                    Enumeration<InetAddress> addresses = iface.getInetAddresses();
-                    while (addresses.hasMoreElements()) {
-                        InetAddress address = addresses.nextElement();
+        // Disabling this block for now.
+        if (1 == 0) {
+            for (int componentId = 0; componentId < iceSocket.getComponents(); componentId++) {
+                try {
+                    Enumeration<NetworkInterface> ifaces =
+                            NetworkInterface.getNetworkInterfaces();
+                    while (ifaces.hasMoreElements()) {
+                        NetworkInterface iface = ifaces.nextElement();
 
-                        // Basic checking to eliminate unusable addresses
-                        if (!address.isLoopbackAddress()
-                                && !address.isLinkLocalAddress()
-                                && !address.isAnyLocalAddress()
-                                && !address.isMulticastAddress()) {
-                            // Create the active (outgoing) socket
-                            {
-                                DemultiplexerSocket socket = StunUtil.getCustomStunPipeline(new InetSocketAddress(address, 0), TransportType.TCP, true, peer);
-                                socket.setMaxRetries(4);
-                                retval.add(new LocalCandidate(
-                                        peer,
-                                        iceSocket,
-                                        CandidateType.LOCAL,
-                                        socket,
-                                        (short) componentId));
+                        Enumeration<InetAddress> addresses = iface.getInetAddresses();
+                        while (addresses.hasMoreElements()) {
+                            InetAddress address = addresses.nextElement();
+
+                            // Basic checking to eliminate unusable addresses
+                            if (!address.isLoopbackAddress()
+                                    && !address.isLinkLocalAddress()
+                                    && !address.isAnyLocalAddress()
+                                    && !address.isMulticastAddress()) {
+                                // Create the active (outgoing) socket
+                                {
+                                    DemultiplexerSocket socket = StunUtil.getCustomStunPipeline(new InetSocketAddress(address, 0), TransportType.TCP, true, peer);
+                                    socket.setMaxRetries(4);
+                                    retval.add(new LocalCandidate(
+                                            peer,
+                                            iceSocket,
+                                            CandidateType.LOCAL,
+                                            socket,
+                                            (short) componentId));
+                                }
+
+                                // Create the passive (incoming) socket
+                                {
+                                    DemultiplexerSocket socket = StunUtil.getCustomStunPipeline(new InetSocketAddress(address, 0), TransportType.TCP, false, peer);
+                                    socket.setMaxRetries(4);
+                                    retval.add(new LocalCandidate(
+                                            peer,
+                                            iceSocket,
+                                            CandidateType.LOCAL,
+                                            socket,
+                                            (short) componentId));
+                                }
+
                             }
-
-                            // Create the passive (incoming) socket
-                            {
-                                DemultiplexerSocket socket = StunUtil.getCustomStunPipeline(new InetSocketAddress(address, 0), TransportType.TCP, false, peer);
-                                socket.setMaxRetries(4);
-                                retval.add(new LocalCandidate(
-                                        peer,
-                                        iceSocket,
-                                        CandidateType.LOCAL,
-                                        socket,
-                                        (short) componentId));
-                            }
-
                         }
-                    }
 
+                    }
+                } catch (IOException ex) {
+                    Logger.getLogger(IceDatagramSocket.class.getName()).log(
+                            Level.SEVERE, null, ex);
                 }
-            } catch (IOException ex) {
-                Logger.getLogger(IceDatagramSocket.class.getName()).log(
-                        Level.SEVERE, null, ex);
             }
         }
 

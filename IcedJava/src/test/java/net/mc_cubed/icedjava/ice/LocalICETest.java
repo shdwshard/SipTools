@@ -25,11 +25,17 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.util.Date;
+import java.util.List;
+import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.sdp.Attribute;
+import javax.sdp.Connection;
 import javax.sdp.MediaDescription;
 import javax.sdp.SdpException;
 import javax.sdp.SdpFactory;
+import javax.sdp.SdpParseException;
+import javax.sdp.SessionDescription;
 import javax.swing.SwingUtilities;
 import junit.framework.Assert;
 import junit.framework.TestCase;
@@ -95,8 +101,9 @@ public class LocalICETest extends TestCase {
             remotePeer = IceFactory.createIcePeer("remotePeer", remoteSockets);
 
             // Establish the SDP connection
-            localPeer.setSdpListener(remotePeer);
-            remotePeer.setSdpListener(localPeer);
+            new LoggingSdpExchanger(remotePeer,localPeer);
+            //localPeer.setSdpListener(remotePeer);
+            //remotePeer.setSdpListener(localPeer);
 
             // Start the local state machine.  This will send an SDP offer then
             //  wait for a reply.
@@ -247,8 +254,9 @@ public class LocalICETest extends TestCase {
             remotePeer = IceFactory.createIcePeer("remotePeer", remoteSockets);
 
             // Establish the SDP connection
-            localPeer.setSdpListener(remotePeer);
-            remotePeer.setSdpListener(localPeer);
+            new LoggingSdpExchanger(remotePeer,localPeer);
+            //localPeer.setSdpListener(remotePeer);
+            //remotePeer.setSdpListener(localPeer);
 
             // Start the local state machine.  This will send an SDP offer then
             //  wait for a reply.
@@ -548,10 +556,10 @@ public class LocalICETest extends TestCase {
                 IceFactory.createIceSocket(medias[1].getMedia())};
 
             // Create a local peer for a yet unspecified remote peer
-            localPeer = IceFactory.createIcePeer("localPeer", localSockets);
+            localPeer = IceFactory.createIcePeer("localPeer", true,localSockets);
 
             // Create a "remote" peer
-            remotePeer = IceFactory.createIcePeer("remotePeer", remoteSockets);
+            remotePeer = IceFactory.createIcePeer("remotePeer", true,remoteSockets);
 
             // Start the local state machine.  This will send an SDP offer then
             //  wait for a reply. This offer will turn remotePeer into the
@@ -671,5 +679,41 @@ public class LocalICETest extends TestCase {
                 form.setVisible(false);
             }
         }
+    }
+    
+    class LoggingSdpExchanger {
+        final Logger log = Logger.getLogger(LoggingSdpExchanger.class.getName());
+        
+        public LoggingSdpExchanger(final IcePeer source1, final IcePeer source2) {
+            source1.setSdpListener(new SDPListener() {
+
+                @Override
+                public void updateMedia(Connection conn, Vector iceAttributes, Vector iceMedias) throws SdpParseException {
+                    log.log(Level.INFO,"{0}\n{1}\n{2}",new Object[] {conn,iceAttributes,iceMedias});
+                    source2.updateMedia(conn,(List)iceAttributes,(List)iceMedias);
+                }
+
+                @Override
+                public void updateMedia(Connection conn, List<Attribute> iceAttributes, List<MediaDescription> iceMedias) throws SdpParseException {
+                    log.log(Level.INFO,"{0}\n{1}\n{2}",new Object[] {conn,iceAttributes,iceMedias});
+                    source2.updateMedia(conn,iceAttributes,iceMedias);
+                }
+            } );
+            source2.setSdpListener(new SDPListener() {
+
+                @Override
+                public void updateMedia(Connection conn, Vector iceAttributes, Vector iceMedias) throws SdpParseException {
+                    log.log(Level.INFO,"{0}\n{1}\n{2}",new Object[] {conn,iceAttributes,iceMedias});
+                    source1.updateMedia(conn,(List)iceAttributes,(List)iceMedias);
+                }
+
+                @Override
+                public void updateMedia(Connection conn, List<Attribute> iceAttributes, List<MediaDescription> iceMedias) throws SdpParseException {
+                    log.log(Level.INFO,"{0}\n{1}\n{2}",new Object[] {conn,iceAttributes,iceMedias});
+                    source1.updateMedia(conn,iceAttributes,iceMedias);
+                }
+            } );
+        }
+        
     }
 }

@@ -19,8 +19,6 @@
  */
 package net.mc_cubed.icedjava.ice;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import javax.sdp.SdpException;
@@ -40,7 +38,6 @@ class IcePeerImpl extends IceStateMachine implements IcePeer {
 
     private ScheduledExecutorService threadpool;
     private final String peerId;
-    private Map<String,IcePeer> myPeerMap;
 
     
     public IcePeerImpl(String peerId, AgentRole agentRole, IceSocket ... sockets) throws SdpException {
@@ -97,20 +94,6 @@ class IcePeerImpl extends IceStateMachine implements IcePeer {
 
     public void setThreadpool(ScheduledExecutorService threadpool) {
         this.threadpool = threadpool;
-    }
-
-    @Override
-    protected Map<String, IcePeer> getPeerMap() {
-        if (myPeerMap != null && !myPeerMap.containsKey(getLocalUFrag())) {
-            myPeerMap = null;
-        }
-        
-        if (myPeerMap == null || myPeerMap.isEmpty()) {
-            myPeerMap = new HashMap<String,IcePeer>();
-            myPeerMap.put(this.getLocalUFrag(), this);
-        }
-        return myPeerMap;
-        
     }
 
     @Override

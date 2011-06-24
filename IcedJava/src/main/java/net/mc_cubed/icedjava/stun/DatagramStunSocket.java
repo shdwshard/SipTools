@@ -325,6 +325,9 @@ class DatagramStunSocket extends BaseFilter implements StunSocket {
                 this.wait();
             }
 
+            if (stunReply == null) {
+                throw new InterruptedException("Got a null StunReply, probably interrupted");
+            }
             return stunReply;
         }
 
@@ -332,6 +335,10 @@ class DatagramStunSocket extends BaseFilter implements StunSocket {
         public synchronized StunReply get(long l, TimeUnit tu) throws InterruptedException, ExecutionException, TimeoutException {
             if (stunReply == null && !timeout) {
                 this.wait(tu.toMillis(l));
+            }
+
+            if (stunReply == null) {
+                throw new InterruptedException("Got a null StunReply, probably interrupted");
             }
 
             return stunReply;

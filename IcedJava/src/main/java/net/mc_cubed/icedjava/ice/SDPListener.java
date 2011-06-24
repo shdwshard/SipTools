@@ -24,9 +24,7 @@ import java.util.Vector;
 import javax.sdp.Attribute;
 import javax.sdp.Connection;
 import javax.sdp.MediaDescription;
-import javax.sdp.SdpException;
 import javax.sdp.SdpParseException;
-import javax.sdp.SessionDescription;
 
 /**
  * An interface for objects listening for SDP updates from an ICE state machine
@@ -38,18 +36,6 @@ import javax.sdp.SessionDescription;
  * @see IcePeer
  */
 public interface SDPListener {
-    /**
-     * Classes implementing the SDPListener interface can be sent an SDP update
-     * to use for ICE or other processing using this method
-     * 
-     * @param session Updated SessionDescription to use for processing
-     * @throws SdpException
-     * @deprecated Use updateMedia() instead
-     * @see .updateMedia
-     */
-    @Deprecated
-    public void sendSession(SessionDescription session)
-            throws SdpException;
 
     /**
      * Classes implementing the SDPListener interface can be sent an SDP update
