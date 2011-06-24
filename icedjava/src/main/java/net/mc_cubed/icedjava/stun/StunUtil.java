@@ -69,48 +69,6 @@ public class StunUtil {
     public static Integer MAX_PACKET_SIZE = 4096;
 
     /**
-     * Get a valid Stun Server name to use for STUN processing.
-     * 
-     * @return a name which can be used by getStunServerByName() to find the
-     * address of a valid stun server.
-     * @deprecated Use getStunServerSocket() instead, which gets and tests the
-     * stun server, and returns a tested server socket.
-     */
-    @Produces
-    @StunServer
-    @Deprecated
-    public static String getStunServer() {
-        try {
-            List<String> servers = new LinkedList<String>();
-
-            servers.addAll(Arrays.asList(serverList));
-
-            Collections.shuffle(servers);
-            StunSocket testSocket = getStunSocket(new InetSocketAddress(InetAddress.getByName("0.0.0.0"), 0), StunSocketType.CLIENT);
-
-            for (String server : servers) {
-                try {
-                    for (InetSocketAddress address : getStunServerByName(server)) {
-                        StunReply reply = testSocket.doTest(address).get();
-                        if (reply != null && reply.isSuccess()) {
-                            return server;
-                        }
-                    }
-                    // Don't interrupt the whole process if one server fails.
-                } catch (Exception ex) {
-                    Logger.getLogger(StunUtil.class.getName()).log(Level.SEVERE, null, ex);
-                }
-
-            }
-        } catch (Exception ex) {
-            Logger.getLogger(StunUtil.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
-        // Failed
-        return null;
-    }
-
-    /**
      * Gets the InetSocketAddress of a valid STUN server picked from the built-in
      * list of stun servers.
      *
@@ -568,7 +526,7 @@ public class StunUtil {
         @Override
         public void run() {
             try {
-                if (transport.getState().getState() == State.START) {
+                if (!transport.isStopped()) {
                     transport.stop();
                 }
             } catch (IOException ex) {
