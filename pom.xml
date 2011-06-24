@@ -8,9 +8,9 @@
     <name>Sip Tools Composite</name>
     <url>http://maven.apache.org</url>
     <modules>
-        <module>bfcpJava</module>
-        <module>icedJava</module>
-        <module>msrpJava</module>
+        <module>BfcpJava</module>
+        <module>IcedJava</module>
+        <module>MsrpJava</module>
         <module>Simple3pcc</module>
     </modules>
     <scm>
