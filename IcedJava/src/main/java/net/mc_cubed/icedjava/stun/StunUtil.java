@@ -408,7 +408,7 @@ public class StunUtil {
                 connection.setProcessor(filterChainBuilder.build());
 
                 // Set the server connection
-                ((StreamDemultiplexerSocket) socket).setServerConnection(connection);
+                ((StreamDemultiplexerServerSocket) socket).setServerConnection(connection);
             }
         }
         return socket;

@@ -408,16 +408,17 @@ public class LocalICETest extends TestCase {
             // Create a "remote" peer
             remotePeer = IceFactory.createIcePeer("remotePeer", remoteSockets);
 
+            // Establish the SDP connection
+            localPeer.setSdpListener(remotePeer);
+            remotePeer.setSdpListener(localPeer);
+
+            ((IceStateMachine)remotePeer).iceStatus = IceStatus.IN_PROGRESS;
             // Start the local state machine.  This will send an SDP offer then
             //  wait for a reply.
             localPeer.start();
 
             Assert.assertEquals(IceStatus.IN_PROGRESS, localPeer.getStatus());
-            Assert.assertEquals(IceStatus.NOT_STARTED, remotePeer.getStatus());
-
-            // Establish the SDP connection
-            localPeer.setSdpListener(remotePeer);
-            remotePeer.setSdpListener(localPeer);
+            Assert.assertEquals(IceStatus.IN_PROGRESS, remotePeer.getStatus());
 
             // Peek at the check pairs so we can see what ICE is actually doing during the test
             if (form != null) {
@@ -561,17 +562,18 @@ public class LocalICETest extends TestCase {
             // Create a "remote" peer
             remotePeer = IceFactory.createIcePeer("remotePeer", true,remoteSockets);
 
-            // Start the local state machine.  This will send an SDP offer then
-            //  wait for a reply. This offer will turn remotePeer into the
-            //  controlled peer.
-            localPeer.start();
-
-            Assert.assertEquals(IceStatus.IN_PROGRESS, localPeer.getStatus());
-            Assert.assertEquals(IceStatus.NOT_STARTED, remotePeer.getStatus());
-
             // Establish the SDP connection
             localPeer.setSdpListener(remotePeer);
             remotePeer.setSdpListener(localPeer);
+
+            ((IceStateMachine)remotePeer).iceStatus = IceStatus.IN_PROGRESS;
+            // Start the local state machine.  This will send an SDP offer then
+            //  wait for a reply.
+            localPeer.start();
+
+            Assert.assertEquals(IceStatus.IN_PROGRESS, localPeer.getStatus());
+            Assert.assertEquals(IceStatus.IN_PROGRESS, remotePeer.getStatus());
+
 
             // Peek at the check pairs so we can see what ICE is actually doing during the test
             if (form != null) {

@@ -119,7 +119,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     private long lastTouch = 0;
     private NominationType nomination = NominationType.REGULAR;
     private boolean restartFlag = false;
-    private IceStatus iceStatus = IceStatus.NOT_STARTED;
+    protected IceStatus iceStatus = IceStatus.NOT_STARTED;
     // Initialized by the constructor
     private AgentRole localRole;
     private boolean icelite;
@@ -658,7 +658,6 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                                     checkPair.setState(PairState.FROZEN);
                                 }
                             }
-
                         }
                     } else {
                         if (result.getErrorCode() == ROLE_CONFLICT) {
@@ -1008,11 +1007,12 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
                 log.warning("Peer will switch roles");
                 return true;
-            }
+            } else {
 
-            // Flip the local role and continue (no error)
-            log.warning("Local role switching");
-            setLocalControlled(!isLocalControlled());
+                // Flip the local role and continue (no error)
+                log.warning("Local role switching");
+                setLocalControlled(!isLocalControlled());
+            }
 
         }
 
