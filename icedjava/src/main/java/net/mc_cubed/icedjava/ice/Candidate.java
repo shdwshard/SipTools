@@ -26,6 +26,7 @@ import java.util.Date;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
+import net.mc_cubed.icedjava.stun.TCPSocketType;
 
 /**
  * The Candidate abstract class defines the basic behavior of a Candidate used
@@ -42,6 +43,7 @@ public abstract class Candidate {
     protected Date lastKeepalive;
     protected Candidate base;
     protected InetSocketAddress socketAddress;
+    protected TCPSocketType socketType;
 
     public abstract String getFoundation();
 
@@ -62,10 +64,20 @@ public abstract class Candidate {
     }
 
     public String toAttributeFormat() {
-        return getFoundation() + " " + getComponentId() + " " + getTransport() + " " + getPriority() +
-                " " + getAddress().getHostAddress() + " " + getPort() + " typ " + getType().netVal() +
-                ((getType() != getType().LOCAL) ? " " + getBaseAddress().getHostAddress() +
-                " " + getBasePort() : "");
+        switch (getTransport()) {
+            default:
+                return null;
+            case UDP:
+                return getFoundation() + " " + getComponentId() + " " + getTransport() + " " + getPriority()
+                        + " " + getAddress().getHostAddress() + " " + getPort() + " typ " + getType().netVal()
+                        + ((getType() != getType().LOCAL) ? " raddr " + getBaseAddress().getHostAddress()
+                        + " rport " + getBasePort() : "");
+            case TCP:
+                return getFoundation() + " " + getComponentId() + " " + getTransport() + " " + getPriority()
+                        + " " + getAddress().getHostAddress() + " " + getPort() + " typ " + getType().netVal()
+                        + ((getType() != getType().LOCAL) ? " raddr " + getBaseAddress().getHostAddress()
+                        + " rport " + getBasePort() : "") + " tcptype " + getSocketType().getNetworkString();                
+        }
     }
 
     abstract protected void setBaseAddress(InetAddress baseAddress);
@@ -133,15 +145,18 @@ public abstract class Candidate {
      */
     public abstract CandidateType getType();
 
+    public TCPSocketType getSocketType() {
+        return socketType;
+    }
+
     public enum CandidateType {
 
-        LOCAL("host",126),              // Priority recommended by RFC 5245:4.1.2.2
-        PEER_REFLEXIVE("prflx",110),    // Priority recommended by RFC 5245:4.1.2.2
-        NAT_ASSISTED("nat",105),        // Priority recommended by ICE-TCP
-        SERVER_REFLEXIVE("srflx",100),  // Priority recommended by RFC 5245:4.1.2.2
-        UDP_TUNNELLED("udptnl",75),     // Priority recommended by ICE-TCP
-        RELAYED("relay",0);             // Priority recommended by RFC 5245:4.1.2.2
-
+        LOCAL("host", 126), // Priority recommended by RFC 5245:4.1.2.2
+        PEER_REFLEXIVE("prflx", 110), // Priority recommended by RFC 5245:4.1.2.2
+        NAT_ASSISTED("nat", 105), // Priority recommended by ICE-TCP
+        SERVER_REFLEXIVE("srflx", 100), // Priority recommended by RFC 5245:4.1.2.2
+        UDP_TUNNELLED("udptnl", 75), // Priority recommended by ICE-TCP
+        RELAYED("relay", 0);             // Priority recommended by RFC 5245:4.1.2.2
         static final Map<String, CandidateType> revLookup =
                 new HashMap<String, CandidateType>();
 
@@ -151,11 +166,11 @@ public abstract class Candidate {
             }
         }
         protected final String netVal;
-        protected final short  priority;
+        protected final short priority;
 
-        CandidateType(String netVal,int priority) {
+        CandidateType(String netVal, int priority) {
             this.netVal = netVal;
-            this.priority = (short)priority;
+            this.priority = (short) priority;
         }
 
         static public CandidateType netValOf(String netVal) {
@@ -169,7 +184,6 @@ public abstract class Candidate {
         public short getPriority() {
             return priority;
         }
-
     }
 
     public InetSocketAddress getSocketAddress() {
@@ -180,6 +194,7 @@ public abstract class Candidate {
         return socketAddress;
     }
 
+    
     @Override
     public boolean equals(Object obj) {
         if (obj == null) {
@@ -213,6 +228,4 @@ public abstract class Candidate {
         hash = 53 * hash + (this.getTransport() != null ? this.getTransport().hashCode() : 0);
         return hash;
     }
-
-    
 }

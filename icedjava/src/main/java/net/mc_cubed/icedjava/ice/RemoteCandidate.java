@@ -25,6 +25,7 @@ import java.net.UnknownHostException;
 import java.util.StringTokenizer;
 import javax.sdp.Attribute;
 import javax.sdp.SdpParseException;
+import net.mc_cubed.icedjava.stun.TCPSocketType;
 
 /**
  * Implementation of a Remote Candidate, which is most often initialized from an
@@ -41,7 +42,6 @@ public class RemoteCandidate extends Candidate {
     private long priority;
     private final short componentId;
     private final TransportType transport;
-
     protected String foundation;
     protected InetAddress baseAddress;
     protected int basePort;
@@ -75,7 +75,7 @@ public class RemoteCandidate extends Candidate {
      * @param base
      */
     public RemoteCandidate(CandidateType type, InetAddress address, int port, String foundation, Candidate base) {
-        this(type,address,port,base.getComponentId(),base.getTransport(),foundation);
+        this(type, address, port, base.getComponentId(), base.getTransport(), foundation);
         this.base = base;
     }
 
@@ -88,32 +88,41 @@ public class RemoteCandidate extends Candidate {
      */
     public RemoteCandidate(Attribute srcAttribute) throws SdpParseException, UnknownHostException {
         StringTokenizer tokens = new StringTokenizer(srcAttribute.getValue());
-        switch (tokens.countTokens()) {
-            case 8:
-                foundation = tokens.nextToken();
-                componentId = Short.valueOf(tokens.nextToken());
-                transport = TransportType.valueOf(tokens.nextToken());
-                priority = Integer.valueOf(tokens.nextToken());
-                address = InetAddress.getByName(tokens.nextToken());
-                port = Integer.valueOf(tokens.nextToken());
-                tokens.nextToken();
-                type = CandidateType.netValOf(tokens.nextToken());
-                // No base values
-                break;
-            case 10:
-                setFoundation(tokens.nextToken());
-                componentId = Short.valueOf(tokens.nextToken());
-                transport = TransportType.valueOf(tokens.nextToken());
-                priority = Integer.valueOf(tokens.nextToken());
-                address = InetAddress.getByName(tokens.nextToken());
-                port = Integer.valueOf(tokens.nextToken());
-                tokens.nextToken();
-                type = CandidateType.netValOf(tokens.nextToken());
-                setBaseAddress(InetAddress.getByName(tokens.nextToken()));
-                setBasePort(Integer.valueOf(tokens.nextToken()));
+        foundation = tokens.nextToken();
+        componentId = Short.valueOf(tokens.nextToken());
+        transport = TransportType.valueOf(tokens.nextToken());
+        priority = Integer.valueOf(tokens.nextToken());
+        address = InetAddress.getByName(tokens.nextToken());
+        port = Integer.valueOf(tokens.nextToken());
+        if (tokens.nextToken().compareTo("typ") != 0) {
+            throw new SdpParseException(0, 0, "Expected 'typ' token, but did not find it!");
+        };
+        type = CandidateType.netValOf(tokens.nextToken());
+
+
+        switch (type) {
+
+            case LOCAL:
+                // No remote values present
                 break;
             default:
-                throw new IllegalArgumentException("Input must be a well formed ICE Candidate Attribute");
+                // All other types give some kind of remote address/port combination
+                if (tokens.nextToken().compareTo("raddr") != 0) {
+                    throw new SdpParseException(0, 0, "Expected 'raddr' token, but did not find it!");
+                }
+                setBaseAddress(InetAddress.getByName(tokens.nextToken()));
+                if (tokens.nextToken().compareTo("rport") != 0) {
+                    throw new SdpParseException(0, 0, "Expected 'rport' token, but did not find it!");
+                }
+                setBasePort(Integer.valueOf(tokens.nextToken()));
+                break;
+        }
+        
+        if (transport == TransportType.TCP) {
+            if (tokens.nextToken().compareTo("tcptype") != 0) {
+                throw new SdpParseException(0, 0, "Expected 'tcptype' token, but did not find it!");                
+            }
+            socketType = TCPSocketType.fromNetworkString(tokens.nextToken());
         }
     }
 
@@ -181,6 +190,4 @@ public class RemoteCandidate extends Candidate {
     public void setPriority(long priority) {
         this.priority = priority;
     }
-
-
 }

@@ -33,6 +33,7 @@ import javax.media.format.VideoFormat;
 public class FormatUtils {
 
     static public final String AVP_STRING = "RTP/AVP";
+    static public final String TCP_AVP_STRING = "TCP/RTP/AVP";
     static public final int DYNAMIC = 96;
     
     static final Format avpTypes[];

@@ -39,7 +39,7 @@ public class StreamingTest extends TestCase {
     // public void testHello() {}
     // This test is a placeholder for now, but will do something eventually.
     public void testRTPManagerStreaming() throws InterruptedException, IOException, SdpException {
-        InetSocketAddress STUN_SERVER = new InetSocketAddress(StunUtil.getStunServer(), StunUtil.STUN_PORT);
+        InetSocketAddress STUN_SERVER = StunUtil.getCachedStunServerSocket();
         InterfaceProfile defaultIf = IceUtil.getBestInterfaceCandidate(STUN_SERVER);
         Media[] medias = new Media[2];
         SdpFactory factory = SdpFactory.getInstance();

@@ -26,6 +26,7 @@ package net.mc_cubed.icedjava.stun;
  * @since 0.9
  */
 public enum TransportType {
+
     UDP,
     TCP;
 }

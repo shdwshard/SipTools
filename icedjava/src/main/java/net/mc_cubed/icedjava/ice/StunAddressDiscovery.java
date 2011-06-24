@@ -38,16 +38,16 @@ import net.mc_cubed.icedjava.stun.StunUtil;
 import net.mc_cubed.icedjava.stun.annotation.StunServer;
 
 /**
- * An AddressDiscoveryMechanism which provides LocalCandidates by performing
+ * An DiscoveryMechanism which provides LocalCandidates by performing
  * STUN tests on Host type candidates.  Used to be a part of IcePeer
  *
  * @author Charles Chappell
  * @since 1.0
  * @see AddressDiscovery
- * @see AddressDiscoveryMechanism
+ * @see DiscoveryMechanism
  * @see IcePeer
  */
-@AddressDiscoveryMechanism
+@DiscoveryMechanism
 public class StunAddressDiscovery implements AddressDiscovery {
 
     @Inject

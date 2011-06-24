@@ -24,6 +24,8 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
@@ -186,6 +188,21 @@ class DatagramDemultiplexerSocket extends DatagramStunSocket implements Demultip
         for (StunEventListener listener : listeners) {
             listener.stunEvent(event);
         }
+    }
+
+    @Override
+    public ServerSocket getServerSocket() {
+        throw new UnsupportedOperationException("Datagram Socket does not support this operation");
+    }
+
+    @Override
+    public Socket getSocket() {
+        throw new UnsupportedOperationException("Datagram Socket does not support this operation");
+    }
+
+    @Override
+    public TCPSocketType getTcpSocketType() {
+        throw new UnsupportedOperationException("Not valid for a datagram socket.");
     }
 
     /**

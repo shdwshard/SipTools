@@ -23,6 +23,7 @@ package net.mc_cubed.icedjava.ice;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import net.mc_cubed.icedjava.stun.DemultiplexerSocket;
+import net.mc_cubed.icedjava.stun.TCPSocketType;
 import net.mc_cubed.icedjava.stun.TransportType;
 
 /**
@@ -45,7 +46,7 @@ public class LocalCandidate extends Candidate {
     DemultiplexerSocket socket;
     private final IcePeer owner;
     private final IceSocket iceSocket;
-
+//
     @Override
     public final String getFoundation() {
         // The foundation computation is defined in 4.1.1.3
@@ -68,6 +69,11 @@ public class LocalCandidate extends Candidate {
         this.socket = socket;
         this.owner = owner;
         this.iceSocket = iceSocket;
+        if (transport == TransportType.TCP) {
+            this.socketType = socket.getTcpSocketType();
+        } else {
+            this.socketType = null;
+        }
     }
 
     public LocalCandidate(IcePeer owner, IceSocket iceSocket, CandidateType type, InetAddress address, int port, LocalCandidate base) {
@@ -80,6 +86,11 @@ public class LocalCandidate extends Candidate {
         this.socket = base.socket;
         this.owner = owner;
         this.iceSocket = iceSocket;
+        if (transport == TransportType.TCP) {
+            this.socketType = socket.getTcpSocketType();
+        } else {
+            this.socketType = null;
+        }
     }
 
     public IceSocket getIceSocket() {

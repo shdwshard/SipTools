@@ -19,7 +19,10 @@
  */
 package net.mc_cubed.icedjava.stun;
 
+import java.io.IOException;
 import java.net.DatagramSocket;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.SocketException;
 import net.mc_cubed.icedjava.stun.event.StunEventListener;
 
@@ -54,5 +57,11 @@ public interface DemultiplexerSocket extends StunSocketChannel,StunPacketSender 
      * @throws SocketException
      */
     public DatagramSocket getDatagramSocket() throws SocketException;
+
+    public ServerSocket getServerSocket() throws IOException;
+
+    public Socket getSocket() throws IOException;
+
+    public TCPSocketType getTcpSocketType();
 
 }

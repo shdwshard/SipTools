@@ -44,7 +44,7 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 public class ServerTest {
 
-    private static DatagramStunSocket socket;
+    private static StunSocket socket;
     private final String server;
 
     public ServerTest(String server) {

@@ -28,8 +28,8 @@ import java.net.Inet4Address;
 import java.util.Collection;
 import java.util.LinkedList;
 import net.mc_cubed.icedjava.ice.AddressDiscovery;
-import net.mc_cubed.icedjava.ice.AddressDiscoveryMechanism;
 import net.mc_cubed.icedjava.ice.Candidate.CandidateType;
+import net.mc_cubed.icedjava.ice.DiscoveryMechanism;
 import net.mc_cubed.icedjava.ice.LocalCandidate;
 import net.mc_cubed.icedjava.stun.TransportType;
 
@@ -44,7 +44,7 @@ import net.mc_cubed.icedjava.stun.TransportType;
  * @author Charles Chappell
  * @since 1.0
  */
-@AddressDiscoveryMechanism
+@DiscoveryMechanism
 @SuppressWarnings("StaticNonFinalUsedInInitialization")
 public class IcePMPBridge implements AddressDiscovery {
 

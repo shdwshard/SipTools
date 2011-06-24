@@ -24,7 +24,6 @@ import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
@@ -34,7 +33,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -77,7 +75,6 @@ import net.mc_cubed.icedjava.packet.attribute.RealmAttribute;
 import net.mc_cubed.icedjava.packet.attribute.UsernameAttribute;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
-import net.mc_cubed.icedjava.stun.DemultiplexerSocket;
 import net.mc_cubed.icedjava.stun.StunReply;
 import net.mc_cubed.icedjava.stun.StunUtil;
 import net.mc_cubed.icedjava.stun.TransportType;
@@ -143,8 +140,11 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     protected final Map<IceSocket, List<CandidatePair>> using = new HashMap<IceSocket, List<CandidatePair>>();
     protected final List<InterfaceProfile> interfaceData;
     @Inject
-    @AddressDiscoveryMechanism
+    @DiscoveryMechanism
     Instance<AddressDiscovery> discoveryMechanisms;
+    @Inject
+    @DiscoveryMechanism
+    Instance<CandidateDiscovery> localCandidateDiscoveryMechs;
     boolean localOnly = false;
     boolean sendKeepalives = false;
     ExpiringCache<SocketAddress, IcePeer> socketCache = new ExpiringCache<SocketAddress, IcePeer>();
@@ -1077,88 +1077,84 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      * @return a list of LocalCandidates
      */
     private List<LocalCandidate> collectCandidates(IceSocket iceSocket) {
-
         log.log(Level.FINE, "Collecting Candidates for peer: {0} on socket {1}", new Object[]{localUFrag, iceSocket});
         List<LocalCandidate> retval = new LinkedList<LocalCandidate>();
-        for (int componentId = 0; componentId < iceSocket.getComponents(); componentId++) {
-            try {
-                Enumeration<NetworkInterface> ifaces =
-                        NetworkInterface.getNetworkInterfaces();
-                while (ifaces.hasMoreElements()) {
-                    NetworkInterface iface = ifaces.nextElement();
 
-                    Enumeration<InetAddress> addresses = iface.getInetAddresses();
-                    while (addresses.hasMoreElements()) {
-                        InetAddress address = addresses.nextElement();
 
-                        // Basic checking to eliminate unusable addresses
-                        if (!address.isLoopbackAddress()
-                                && !address.isLinkLocalAddress()
-                                && !address.isAnyLocalAddress()
-                                && !address.isMulticastAddress()) {
-                            DemultiplexerSocket socket = StunUtil.getCustomStunPipeline(new InetSocketAddress(address, 0), this);
-                            socket.setMaxRetries(4);
-                            retval.add(new LocalCandidate(
-                                    this,
-                                    iceSocket,
-                                    CandidateType.LOCAL,
-                                    socket,
-                                    (short) componentId));
-                        }
-                    }
-
-                }
-            } catch (IOException ex) {
-                Logger.getLogger(IceDatagramSocket.class.getName()).log(
-                        Level.SEVERE, null, ex);
-            }
-
+        /**
+         * If we're in a WELD environment, take advantage of it by using the 
+         * extensibility mechanisms
+         */
+        if (localCandidateDiscoveryMechs != null && !localCandidateDiscoveryMechs.isUnsatisfied()) {
             /**
-             * Skip additional candidate processing if we're in local only mode.
+             * Each individual mechanism potentially has something to offer, so
+             * collect all possibilities
              */
-            if (!localOnly) {
-                // If we're in a WELD environment, take advantage of it
-                if (discoveryMechanisms != null && !discoveryMechanisms.isUnsatisfied()) {
-                    // For each address discovery mechanism...
-                    for (AddressDiscovery discoveryMechanism : discoveryMechanisms) {
-                        try {
-                            // Add additional candidates to the list
-                            retval.addAll(discoveryMechanism.getCandidates(retval));
-                        } catch (Exception ex) {
-                            log.log(Level.WARNING, "Exception during address discovery.", ex);
-                        }
-                    }
-                } else {
-                    /**
-                     * If we're not in a weld environment, that's OK too, but the
-                     * extensibile address discovery mechanisms won't be used.
-                     */
-                    try {
-                        // Collect Server Reflexive candidates
-                        retval.addAll(new StunAddressDiscovery().getCandidates(retval));
-                    } catch (Exception ex) {
-                        log.log(Level.WARNING, "Caught an Exception during STUN procedures.", ex);
-                    }
-
-                    try {
-                        // Collect UPNP candidates
-                        retval.addAll(new IceUPNPBridge().getCandidates(retval));
-                    } catch (Exception ex) {
-                        log.log(Level.FINE, "Caught an Exception during UPNP procedures.", ex);
-                    }
-
-                    try {
-                        // Collect PMP candidates
-                        retval.addAll(new IcePMPBridge().getCandidates(retval));
-                    } catch (Exception ex) {
-                        log.log(Level.FINE, "Caught an Exception during PMP procedures.", ex);
-                    }
-
-
-                    // TODO: Collect Server Relayed Candidates if supported by server
+            for (CandidateDiscovery discoveryMechanism : localCandidateDiscoveryMechs) {
+                try {
+                    retval.addAll(discoveryMechanism.discoverCandidates(this, iceSocket));
+                } catch (Exception ex) {
+                    log.log(Level.SEVERE, "Caught an exception during candidate discovery", ex);
                 }
             }
+        } else {
+            /**
+             * If we're not in a WELD environment, that's OK too, but we will
+             * only find IPv4 and IPv6 candidates.
+             */
+            for (Class discoveryClass : new Class[]{UDPCandidateDiscovery.class, TCPCandidateDiscovery.class}) {
+                try {
+                    retval.addAll(((CandidateDiscovery) discoveryClass.newInstance()).discoverCandidates(this, iceSocket));
+                } catch (Exception ex) {
+                    log.log(Level.SEVERE, "Caught an exception during candidate discovery", ex);
+                }
+            }
+        }
 
+        /**
+         * Skip additional candidate processing if we're in local only mode.
+         */
+        if (!localOnly) {
+            // If we're in a WELD environment, take advantage of it
+            if (discoveryMechanisms != null && !discoveryMechanisms.isUnsatisfied()) {
+                // For each address discovery mechanism...
+                for (AddressDiscovery discoveryMechanism : discoveryMechanisms) {
+                    try {
+                        // Add additional candidates to the list
+                        retval.addAll(discoveryMechanism.getCandidates(retval));
+                    } catch (Exception ex) {
+                        log.log(Level.WARNING, "Exception during address discovery.", ex);
+                    }
+                }
+            } else {
+                /**
+                 * If we're not in a weld environment, that's OK too, but the
+                 * extensibile address discovery mechanisms won't be used.
+                 */
+                try {
+                    // Collect Server Reflexive candidates
+                    retval.addAll(new StunAddressDiscovery().getCandidates(retval));
+                } catch (Exception ex) {
+                    log.log(Level.WARNING, "Caught an Exception during STUN procedures.", ex);
+                }
+
+                try {
+                    // Collect UPNP candidates
+                    retval.addAll(new IceUPNPBridge().getCandidates(retval));
+                } catch (Exception ex) {
+                    log.log(Level.FINE, "Caught an Exception during UPNP procedures.", ex);
+                }
+
+                try {
+                    // Collect PMP candidates
+                    retval.addAll(new IcePMPBridge().getCandidates(retval));
+                } catch (Exception ex) {
+                    log.log(Level.FINE, "Caught an Exception during PMP procedures.", ex);
+                }
+
+
+                // TODO: Collect Server Relayed Candidates if supported by server
+            }
         }
         return prioritize(retval);
     }

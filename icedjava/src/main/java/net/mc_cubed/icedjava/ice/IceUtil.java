@@ -121,7 +121,7 @@ public class IceUtil {
                 while (addrs.hasMoreElements()) {
                     InetAddress addr = addrs.nextElement();
                     StunSocket socket = null;
-                    if (!addr.isLinkLocalAddress() && !addr.isLoopbackAddress() 
+                    if (!addr.isLinkLocalAddress() && !addr.isLoopbackAddress()
                             && !addr.isMulticastAddress()) {
                         try {
                             // Create a stun socket to measure this IP.
@@ -151,7 +151,9 @@ public class IceUtil {
                             // Sockets that return an IOException on testing won't be
                             //  included in the candidate list.
                         } finally {
-                            socket.close();
+                            if (socket != null) {
+                                socket.close();
+                            }
                         }
                     }
                 }
@@ -161,7 +163,7 @@ public class IceUtil {
 
             return ifaceList;
         } catch (Exception ex) {
-            Logger.getLogger(IceUtil.class.getName()).log(Level.SEVERE,"Caught an exception during interface discovery",ex);
+            Logger.getLogger(IceUtil.class.getName()).log(Level.SEVERE, "Caught an exception during interface discovery", ex);
             return null;
         }
 
