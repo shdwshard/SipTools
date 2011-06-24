@@ -9,7 +9,7 @@
     <groupId>net.mc_cubed</groupId>
     <artifactId>icedjava</artifactId>
     <name>IcedJava</name>
-    <version>1.0-alpha3</version>
+    <version>1.0-alpha4</version>
     <licenses>
         <license>
             <name>LGPL 3.0</name>
@@ -82,7 +82,6 @@
                 </executions>
             </plugin>
         </plugins>
-        <finalName>${artifactId}-${version}-r${changeSet}</finalName>
     </build>
     <dependencies>
         <dependency>
