@@ -33,7 +33,7 @@ import net.mc_cubed.icedjava.stun.event.StunEventListener;
  * @author Charles Chappell
  * @since 1.0
  */
-public interface DemultiplexerSocket extends StunSocketChannel,StunPacketSender {
+public interface DemultiplexerSocket extends StunSocketChannel, StunPacketSender {
 
     /**
      * Register a stun event listener with this demultiplexer socket.
@@ -41,14 +41,22 @@ public interface DemultiplexerSocket extends StunSocketChannel,StunPacketSender 
      * @param listener listener to register
      */
     public void registerStunEventListener(StunEventListener listener);
-    
+
     /**
      * De-register a stun event listener from this demultiplexer socket.
      * 
      * @param listener listener to register
      */
     public void deregisterStunEventListener(StunEventListener listener);
-    
+
+    /**
+     * Set a stun event listener as the sole listener for this demultiplexer 
+     * socket.
+     * 
+     * @param listener listener to register
+     */
+    public void setStunEventListener(StunEventListener listener);
+
     /**
      * Get a java OIO DatagramSocket representing the non-stun data side of this
      * DemultiplexerSocket
@@ -63,5 +71,4 @@ public interface DemultiplexerSocket extends StunSocketChannel,StunPacketSender 
     public Socket getSocket() throws IOException;
 
     public TCPSocketType getTcpSocketType();
-
 }

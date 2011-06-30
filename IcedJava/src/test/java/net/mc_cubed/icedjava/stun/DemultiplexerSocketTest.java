@@ -64,7 +64,7 @@ public class DemultiplexerSocketTest extends TestCase {
 
     }
 
-    public void testTCPSocket() throws Exception, Throwable {
+    public void ignoreTestTCPSocket() throws Exception, Throwable {
         System.out.println("socket");
         DemultiplexerSocket instance1 = StunUtil.getDemultiplexerSocket(new InetSocketAddress(1234),TransportType.TCP,true,null);
         DemultiplexerSocket instance2 = StunUtil.getDemultiplexerSocket(new InetSocketAddress(5678),TransportType.TCP,false,null);

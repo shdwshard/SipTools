@@ -36,7 +36,7 @@ import org.glassfish.grizzly.filterchain.Filter;
  * @author Charles Chappell
  * @since 0.9
  */
-public interface IcePeer extends SDPListener,Filter {
+public interface IcePeer extends SDPListener, Filter {
 
     SessionDescription createOffer() throws SdpException;
 

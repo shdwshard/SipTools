@@ -159,8 +159,10 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
             net.mc_cubed.icedjava.stun.event.DemultiplexedBytesAvailableEvent bytesEvent = (net.mc_cubed.icedjava.stun.event.DemultiplexedBytesAvailableEvent) event;
             ByteBuffer buffer = ByteBuffer.allocate(4096);
             SocketAddress address = bytesEvent.getChannel().receive(buffer);
-            queue.add(buffer);
-            fireEvent(new BytesAvailableEventImpl(this));
+            if (address != null) {
+                queue.add(buffer);
+                fireEvent(new BytesAvailableEventImpl(this));
+            }
         }
     }
 

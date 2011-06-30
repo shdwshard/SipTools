@@ -148,6 +148,12 @@ class StreamDemultiplexerSocket extends AbstractStunSocket implements Demultiple
     }
 
     @Override
+    public void setStunEventListener(StunEventListener listener) {
+        listeners.clear();
+        listeners.add(listener);
+    }
+
+    @Override
     public void deregisterStunEventListener(StunEventListener listener) {
         listeners.remove(listener);
     }

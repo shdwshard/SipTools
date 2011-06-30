@@ -154,9 +154,19 @@ class DatagramDemultiplexerSocket extends DatagramStunSocket implements Demultip
     public SocketAddress receive(ByteBuffer dst) {
         AddressedByteBuffer packet = bufferQueue.poll();
 
-        dst.put(packet.getBuffer());
-        dst.flip();
-        return packet.getAddress();
+        if (packet != null) {
+            // Put the contents of our buffer into the destination buffer
+            dst.put(packet.getBuffer());
+            // Flip the buffer for reading
+            dst.flip();
+            // Return the source address
+            return packet.getAddress();
+        } else {
+            // Flip the buffer so it looks empty if the caller tries to read it.
+            dst.flip();
+            // Return null to indicate no packet read.
+            return null;
+        }
     }
 
     @Override
@@ -168,6 +178,12 @@ class DatagramDemultiplexerSocket extends DatagramStunSocket implements Demultip
 
     @Override
     public void registerStunEventListener(StunEventListener listener) {
+        listeners.add(listener);
+    }
+
+    @Override
+    public void setStunEventListener(StunEventListener listener) {
+        listeners.clear();
         listeners.add(listener);
     }
 

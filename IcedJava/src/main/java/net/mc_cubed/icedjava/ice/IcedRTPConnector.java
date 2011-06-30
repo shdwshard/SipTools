@@ -310,14 +310,13 @@ public class IcedRTPConnector extends IceDatagramSocket
          */
         @Override
         @SuppressWarnings("CallToThreadDumpStack")
-        public int write(byte[] buffer, int offset, int length) {
+        public synchronized int write(byte[] buffer, int offset, int length) {
             ByteBuffer bb = ByteBuffer.wrap(buffer, offset, length);
             for (IcePeer peer : socket.getPeers()) {
                 try {
                     peer.getChannels(socket).get(componentId).write(bb);
                 } catch (Exception ex) {
-                    ex.printStackTrace();
-                    return -1;
+                    Logger.getLogger(getClass().getName()).log(Level.FINE,"Exception writing to a socket channel",ex);
                 }
             }
             return length;

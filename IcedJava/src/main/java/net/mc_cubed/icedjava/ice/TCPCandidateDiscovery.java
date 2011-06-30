@@ -94,7 +94,7 @@ public class TCPCandidateDiscovery implements CandidateDiscovery {
                     }
                 } catch (IOException ex) {
                     Logger.getLogger(IceDatagramSocket.class.getName()).log(
-                            Level.SEVERE, null, ex);
+                            Level.INFO, "Caught an exception during interface discovery.  Probably not serious.", ex);
                 }
             }
         }

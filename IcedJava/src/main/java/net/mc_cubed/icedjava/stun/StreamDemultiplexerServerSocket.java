@@ -185,6 +185,12 @@ class StreamDemultiplexerServerSocket extends BaseFilter implements Demultiplexe
     public void deregisterStunEventListener(StunEventListener listener) {
         listeners.remove(listener);
     }
+    
+    @Override
+    public void setStunEventListener(StunEventListener listener) {
+        listeners.clear();
+        listeners.add(listener);
+    }
 
     private void broadcastReceivedMessage() {
         StunEvent event = new BytesAvailableEventImpl(this);

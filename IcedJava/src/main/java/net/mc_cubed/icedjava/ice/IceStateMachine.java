@@ -113,10 +113,10 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     private int iceInterval = 500;
     private ScheduledFuture task = null;
     private long lastSent = 0;
-    //private boolean sdpTimeout = true;
+    private boolean sdpTimeout = true;
     private long refreshDelay = 15000; // 15 seconds
-    private long sdpTimeoutTime = 15000;
-    private long lastTouch = 0;
+    //private long sdpTimeoutTime = 15000;
+    //private long lastTouch = 0;
     private NominationType nomination = NominationType.REGULAR;
     private boolean restartFlag = false;
     protected IceStatus iceStatus = IceStatus.NOT_STARTED;
@@ -864,15 +864,16 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      */
     @Override
     public boolean isSdpTimeout() {
-        return (new Date().getTime() - lastTouch > sdpTimeoutTime);
+        return this.sdpTimeout;
+//        return (new Date().getTime() - lastTouch > sdpTimeoutTime);
     }
-
+    
     /**
      * @param sdpTimeout the sdpTimeout to set
      */
     @Override
     public void setSdpTimeout(boolean sdpTimeout) {
-        lastTouch = sdpTimeout ? 0: new Date().getTime();
+        this.sdpTimeout = sdpTimeout;
     }
 
     @Override
@@ -1205,7 +1206,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
             }
         }
-        lastTouch = new Date().getTime();
+        //lastTouch = new Date().getTime();
     }
 
     /**
@@ -1340,7 +1341,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
          * MUST NOT utilize this mechanism for call hold, and instead MUST use
          * a=inactive and a=sendonly as described in [RFC3264].
          */
-        if (conn.getAddressType().equalsIgnoreCase(conn.IP4)
+        if (Connection.IP4.equalsIgnoreCase(conn.getAddressType())
                 && conn.getAddress().equalsIgnoreCase("0.0.0.0")) {
             restartFlag = true;
         }
@@ -2453,7 +2454,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             }
             List<LocalCandidate> localCandidates = getLocalCandidates(socket);
             for (LocalCandidate candidate : localCandidates) {
-                candidate.socket.registerStunEventListener((IceDatagramSocketChannel) channelList.get(candidate.getComponentId()));
+                candidate.socket.setStunEventListener((IceDatagramSocketChannel) channelList.get(candidate.getComponentId()));
             }
             channels.put(socket, channelList);
         }
