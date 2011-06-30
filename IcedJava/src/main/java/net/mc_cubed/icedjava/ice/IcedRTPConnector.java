@@ -25,8 +25,6 @@ import javax.media.protocol.ContentDescriptor;
 import javax.media.protocol.SourceTransferHandler;
 import javax.sdp.SdpParseException;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
@@ -53,8 +51,13 @@ public class IcedRTPConnector extends IceDatagramSocket
     private final BidirectionalStreamSocket rtpSocket;
     private final BidirectionalStreamSocket rtcpSocket;
 
-    public IcedRTPConnector(InetSocketAddress stunServer, Media media, InetAddress defaultIP) throws SocketException, SdpParseException {
-        super(stunServer, media);
+    public IcedRTPConnector() throws SocketException, SdpParseException {
+        super((short)2);
+        rtpSocket = new BidirectionalStreamSocket((short) 0);
+        rtcpSocket = new BidirectionalStreamSocket((short) 1);
+    }
+    public IcedRTPConnector(Media media) throws SocketException, SdpParseException {
+        super(media);
 
         rtpSocket = new BidirectionalStreamSocket((short) 0);
         if (media.getPortCount() >= 2) {

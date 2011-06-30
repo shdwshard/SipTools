@@ -23,7 +23,6 @@ import java.net.SocketException;
 import javax.sdp.Media;
 import javax.sdp.SdpException;
 import javax.sdp.SdpParseException;
-import net.mc_cubed.icedjava.ice.IceStateMachine.AgentRole;
 import net.mc_cubed.icedjava.ice.IceStateMachine.NominationType;
 
 /**
@@ -52,7 +51,7 @@ public class IceFactory {
             return new IceStreamSocket(media);
         }
     }
-    
+        
     /**
      * Create an IcePeer not bound to any IceSockets
      * 
@@ -83,7 +82,7 @@ public class IceFactory {
      * @throws SdpException 
      */
     public static IcePeer createIcePeer(String peerId,IceSocket... sockets) throws SdpException {
-        return new IcePeerImpl(peerId,AgentRole.CONTROLLING,sockets);
+        return new IcePeerImpl(peerId,sockets);
     }
 
     /**
@@ -96,7 +95,7 @@ public class IceFactory {
      * @throws SdpException 
      */
     public static IcePeer createIcePeer(String peerId,boolean aggressive,IceSocket... sockets) throws SdpException {
-        return new IcePeerImpl(peerId,AgentRole.CONTROLLING,aggressive ? NominationType.AGGRESSIVE: NominationType.REGULAR,sockets);
+        return new IcePeerImpl(peerId,aggressive ? NominationType.AGGRESSIVE: NominationType.REGULAR,sockets);
     }
 
     private IceFactory() {

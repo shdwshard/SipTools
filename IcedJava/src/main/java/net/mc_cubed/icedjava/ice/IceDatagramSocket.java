@@ -23,7 +23,6 @@ import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 import javax.sdp.Media;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.util.Collection;
@@ -36,7 +35,6 @@ import javax.sdp.Attribute;
 import javax.sdp.MediaDescription;
 import javax.sdp.SdpFactory;
 import javax.sdp.SdpParseException;
-import net.mc_cubed.icedjava.stun.StunUtil;
 import net.mc_cubed.icedjava.stun.TCPSocketType;
 import net.mc_cubed.icedjava.stun.TransportType;
 import net.mc_cubed.icedjava.util.ExpiringCache;
@@ -56,7 +54,7 @@ import org.glassfish.grizzly.filterchain.BaseFilter;
  */
 public class IceDatagramSocket extends BaseFilter implements IceSocket {
 
-    private final InetSocketAddress stunServer;
+    //private final InetSocketAddress stunServer;
     private Map<String, IcePeer> _peers = new HashMap<String, IcePeer>();
     private final static Logger log =
             Logger.getLogger(net.mc_cubed.icedjava.ice.IceDatagramSocket.class.getName());
@@ -118,27 +116,18 @@ public class IceDatagramSocket extends BaseFilter implements IceSocket {
      * @throws IOException
      * @throws InterruptedException
      */
-    protected IceDatagramSocket(InetSocketAddress stunServer)
+    protected IceDatagramSocket()
             throws SocketException, IOException, InterruptedException {
-        this(stunServer, (short) 1);
+        this((short) 1);
     }
 
-    protected IceDatagramSocket(InetSocketAddress stunServer, short components)
+    protected IceDatagramSocket(short components)
             throws SocketException {
-        this.stunServer = stunServer;
         this.components = components;
         setMedia(null);
     }
 
-    protected IceDatagramSocket(InetSocketAddress stunServer,
-            Media media) throws SocketException, SdpParseException {
-        this.stunServer = stunServer;
-        setMedia(media);
-    }
-
-    protected IceDatagramSocket(Media media)
-            throws SocketException, SdpParseException {
-        this.stunServer = StunUtil.getCachedStunServerSocket();
+    protected IceDatagramSocket(Media media) throws SocketException, SdpParseException {
         setMedia(media);
     }
 
@@ -168,9 +157,6 @@ public class IceDatagramSocket extends BaseFilter implements IceSocket {
         return !isOpen();
     }
 
-    public InetSocketAddress getStunServer() {
-        return stunServer;
-    }
     protected IceSocketChannel[] socketChannels;
     public static final String PROP_SOCKETCHANNELS = "socketChannels";
 

@@ -32,7 +32,6 @@ import javax.sdp.SdpFactory;
 import javax.sdp.SdpParseException;
 import javax.sdp.SessionDescription;
 import junit.framework.TestCase;
-import net.mc_cubed.icedjava.ice.IceStateMachine.AgentRole;
 import net.mc_cubed.icedjava.stun.StunUtil;
 
 /**
@@ -65,8 +64,8 @@ public class IcePeerTest extends TestCase {
         SdpFactory factory = SdpFactory.getInstance();
         IceSocket[] iceSockets = new IceSocket[]{
             IceFactory.createIceSocket(factory.createMediaDescription("video", 0, 2, "RTP/AVP", new String[]{"26"}).getMedia()),
-            IceFactory.createIceSocket(factory.createMediaDescription("audio", 0, 2, "RTP/AVP", new String[]{"8"}).getMedia())};
-        IcePeerImpl instance = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, null, null, iceSockets);
+            IceFactory.createIceSocket(factory.createMediaDescription("audio", 0, 2, "RTP/AVP", new String[]{"8"}).getMedia())};        
+        IcePeerImpl instance = (IcePeerImpl)IceFactory.createIcePeer("localPeer", iceSockets);
         List<LocalCandidate> candidates = new LinkedList<LocalCandidate>();
         for (IceSocket socket : instance.getIceSockets()) {
             candidates.addAll(instance.getLocalCandidates(socket));
@@ -92,7 +91,7 @@ public class IcePeerTest extends TestCase {
         IceSocket[] iceSockets = new IceSocket[]{
             IceFactory.createIceSocket(factory.createMediaDescription("video", 0, 2, "RTP/AVP", new String[]{"26"}).getMedia()),
             IceFactory.createIceSocket(factory.createMediaDescription("audio", 0, 2, "RTP/AVP", new String[]{"8"}).getMedia())};
-        IcePeerImpl instance = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, null, null, iceSockets);
+        IcePeerImpl instance = (IcePeerImpl)IceFactory.createIcePeer("localPeer", iceSockets);
         SessionDescription session = instance.createOffer();
         System.out.println(session);
 

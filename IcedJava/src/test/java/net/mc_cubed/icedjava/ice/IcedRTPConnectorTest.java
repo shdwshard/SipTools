@@ -67,7 +67,7 @@ public class IcedRTPConnectorTest extends TestCase {
     public void testRemoveTargets() throws SocketException, SdpParseException {
         System.out.println("removeTargets");
         String reason = "Because this is a test";
-        IcedRTPConnector instance = new IcedRTPConnector(STUN_SERVER,MEDIA,DEFAULT_IF.getPublicIP());
+        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
         instance.removeTargets(reason);
     }
 
@@ -76,7 +76,7 @@ public class IcedRTPConnectorTest extends TestCase {
      */
     public void testGetDataInputStream() throws Exception {
         System.out.println("getDataInputStream");
-        IcedRTPConnector instance = new IcedRTPConnector(STUN_SERVER,MEDIA,DEFAULT_IF.getPublicIP());
+        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
         PushSourceStream result = instance.getDataInputStream();
         assertNotNull(result);
     }
@@ -86,7 +86,7 @@ public class IcedRTPConnectorTest extends TestCase {
      */
     public void testGetDataOutputStream() throws Exception {
         System.out.println("getDataOutputStream");
-        IcedRTPConnector instance = new IcedRTPConnector(STUN_SERVER,MEDIA,DEFAULT_IF.getPublicIP());
+        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
         OutputDataStream result = instance.getDataOutputStream();
         assertNotNull(result);
     }
@@ -96,7 +96,7 @@ public class IcedRTPConnectorTest extends TestCase {
      */
     public void testGetControlInputStream() throws Exception {
         System.out.println("getControlInputStream");
-        IcedRTPConnector instance = new IcedRTPConnector(STUN_SERVER,MEDIA,DEFAULT_IF.getPublicIP());
+        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
         PushSourceStream result = instance.getControlInputStream();
         assertNotNull(result);
     }
@@ -106,7 +106,7 @@ public class IcedRTPConnectorTest extends TestCase {
      */
     public void testGetControlOutputStream() throws Exception {
         System.out.println("getControlOutputStream");
-        IcedRTPConnector instance = new IcedRTPConnector(STUN_SERVER,MEDIA,DEFAULT_IF.getPublicIP());
+        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
         OutputDataStream result = instance.getControlOutputStream();
         assertNotNull(result);
     }
@@ -116,7 +116,7 @@ public class IcedRTPConnectorTest extends TestCase {
      */
     public void testGetReceiveBufferSize() throws SocketException, SdpParseException {
         System.out.println("getReceiveBufferSize");
-        IcedRTPConnector instance = new IcedRTPConnector(STUN_SERVER,MEDIA,DEFAULT_IF.getPublicIP());
+        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
         int expResult = -1;
         int result = instance.getReceiveBufferSize();
         assertEquals(expResult, result);
@@ -128,7 +128,7 @@ public class IcedRTPConnectorTest extends TestCase {
     public void testSetSendBufferSize() throws Exception {
         System.out.println("setSendBufferSize");
         int arg0 = 1234;
-        IcedRTPConnector instance = new IcedRTPConnector(STUN_SERVER,MEDIA,DEFAULT_IF.getPublicIP());
+        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
         instance.setSendBufferSize(arg0);
     }
 
@@ -137,7 +137,7 @@ public class IcedRTPConnectorTest extends TestCase {
      */
     public void testGetSendBufferSize() throws SocketException, SdpParseException {
         System.out.println("getSendBufferSize");
-        IcedRTPConnector instance = new IcedRTPConnector(STUN_SERVER,MEDIA,DEFAULT_IF.getPublicIP());
+        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
         int expResult = -1;
         int result = instance.getSendBufferSize();
         assertEquals(expResult, result);
@@ -148,7 +148,7 @@ public class IcedRTPConnectorTest extends TestCase {
      */
     public void testGetRTCPBandwidthFraction() throws SocketException, SdpParseException {
         System.out.println("getRTCPBandwidthFraction");
-        IcedRTPConnector instance = new IcedRTPConnector(STUN_SERVER,MEDIA,DEFAULT_IF.getPublicIP());
+        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
         double expResult = -1;
         double result = instance.getRTCPBandwidthFraction();
         // Does not specify, but leaves this to the RTPManager
@@ -160,7 +160,7 @@ public class IcedRTPConnectorTest extends TestCase {
      */
     public void testGetRTCPSenderBandwidthFraction() throws SocketException, SdpParseException {
         System.out.println("getRTCPSenderBandwidthFraction");
-        IcedRTPConnector instance = new IcedRTPConnector(STUN_SERVER,MEDIA,DEFAULT_IF.getPublicIP());
+        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
         double expResult = -1;
         double result = instance.getRTCPSenderBandwidthFraction();
 

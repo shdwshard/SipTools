@@ -40,12 +40,8 @@ class IcePeerImpl extends IceStateMachine implements IcePeer {
     private final String peerId;
 
     
-    public IcePeerImpl(String peerId, AgentRole agentRole, IceSocket ... sockets) throws SdpException {
-        this(peerId, agentRole, null, null, sockets);
-    }
-    
-    public IcePeerImpl(String peerId, AgentRole agentRole, NominationType nomination, IceSocket ... sockets) throws SdpException {
-        this(peerId, agentRole, null, null, sockets);
+    public IcePeerImpl(String peerId, NominationType nomination, IceSocket ... sockets) throws SdpException {
+        this(peerId, sockets);
         this.setNomination(nomination);
     }
 
@@ -54,29 +50,23 @@ class IcePeerImpl extends IceStateMachine implements IcePeer {
     }
 
     public IcePeerImpl(IceSocket ... sockets) throws SdpException {
-        this(null,AgentRole.CONTROLLING,sockets);
+        this(null,sockets);
     }
 
-    public IcePeerImpl(String peerId, AgentRole agentRole, String uFrag, String password,
-            IceSocket... sockets) throws SdpParseException, SdpException {
-        this(peerId,agentRole,uFrag,password,false,sockets);
+    public IcePeerImpl(String peerId,IceSocket... sockets) throws SdpParseException, SdpException {
+        this(peerId,false,sockets);
     }
     
-    public IcePeerImpl(String peerId, AgentRole agentRole, String uFrag, String password,
+    public IcePeerImpl(String peerId,
             boolean liteImplementation,IceSocket... sockets) throws SdpParseException, SdpException {
 
-        super(null,agentRole,liteImplementation);
+        super(null,liteImplementation);
         
         if (sockets == null || sockets.length == 0) {
             throw new IllegalArgumentException("Null or zero number of sockets NOT permitted");
         }
 
         this.peerId = peerId;
-
-        if (agentRole == AgentRole.CONTROLLED) {
-            setRemoteUFrag(uFrag);
-            setRemotePassword(password);
-        }
 
         // Set up the LocalCandidates for each Media Description
 

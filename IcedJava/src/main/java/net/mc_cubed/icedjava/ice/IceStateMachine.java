@@ -120,8 +120,8 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     private NominationType nomination = NominationType.REGULAR;
     private boolean restartFlag = false;
     protected IceStatus iceStatus = IceStatus.NOT_STARTED;
+    private AgentRole localRole = AgentRole.CONTROLLING;
     // Initialized by the constructor
-    private AgentRole localRole;
     private boolean icelite;
     private SDPListener sdpListener;
     private InetSocketAddress stunServer = StunUtil.getCachedStunServerSocket();
@@ -224,10 +224,9 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      * @param nomination The nomination type used by this ICE machine, either
      * aggressive or normal.
      */
-    public IceStateMachine(SDPListener listener, AgentRole role, boolean icelite, NominationType nomination) {
+    public IceStateMachine(SDPListener listener, boolean icelite, NominationType nomination) {
         this.sdpListener = listener;
         this.icelite = icelite;
-        this.localRole = role;
         this.nomination = nomination;
 
         // Initialize internal state
@@ -244,25 +243,16 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      * @param role The role of this state machine
      * @param icelite true if we're running a "lite" ICE state machine, false otherwise
      */
-    public IceStateMachine(SDPListener listener, AgentRole role, boolean icelite) {
-        this(listener, role, icelite, NominationType.REGULAR);
+    public IceStateMachine(SDPListener listener, boolean icelite) {
+        this(listener, icelite, NominationType.REGULAR);
     }
 
     /**
      * Constructs a full Implementation ICE state machine
      * @param listener The listener to send SDP updates to
-     * @param role The role of this state machine
-     */
-    public IceStateMachine(SDPListener listener, AgentRole role) {
-        this(listener, role, false);
-    }
-
-    /**
-     * @param listener The listener to send SDP updates to
-     * @param role The role of this state machine
      */
     public IceStateMachine(SDPListener listener) {
-        this(listener, AgentRole.CONTROLLING);
+        this(listener, false);
     }
 
     /**
@@ -2034,6 +2024,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
              */
             if (socket.getMedia().getProtocol().startsWith("RTP")
                     && socket.getMedia().getPortCount() == 2
+                    && useAddrs.size() > 1 
                     && useAddrs.get(1) != null) {
                 media.getMedia().setPortCount(1);
                 media.setAttribute("rtcp", Integer.toString(useAddrs.get(1).getPort()));

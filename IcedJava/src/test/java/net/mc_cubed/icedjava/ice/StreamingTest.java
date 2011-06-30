@@ -5,15 +5,12 @@
 package net.mc_cubed.icedjava.ice;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.Date;
 import javax.sdp.Media;
 import javax.sdp.SdpException;
 import javax.sdp.SdpFactory;
 import junit.framework.Assert;
 import junit.framework.TestCase;
-import net.mc_cubed.icedjava.ice.IceStateMachine.AgentRole;
-import net.mc_cubed.icedjava.stun.StunUtil;
 
 /**
  *
@@ -39,30 +36,25 @@ public class StreamingTest extends TestCase {
     // public void testHello() {}
     // This test is a placeholder for now, but will do something eventually.
     public void testRTPManagerStreaming() throws InterruptedException, IOException, SdpException {
-        InetSocketAddress STUN_SERVER = StunUtil.getCachedStunServerSocket();
-        InterfaceProfile defaultIf = IceUtil.getBestInterfaceCandidate(STUN_SERVER);
         Media[] medias = new Media[2];
         SdpFactory factory = SdpFactory.getInstance();
         medias[0] = factory.createMediaDescription("video", 0, 2, "RTP/AVP", new String[]{"26"}).getMedia();
         medias[1] = factory.createMediaDescription("audio", 0, 2, "RTP/AVP", new String[]{"8"}).getMedia();
-        final IcedRTPConnector[] localSockets = new IcedRTPConnector[]{new IcedRTPConnector(STUN_SERVER, medias[0], defaultIf.getPublicIP()),
-            new IcedRTPConnector(STUN_SERVER, medias[1], defaultIf.getPublicIP())};
-        final IcedRTPConnector[] remoteSockets = new IcedRTPConnector[]{new IcedRTPConnector(STUN_SERVER, medias[0], defaultIf.getPublicIP()),
-            new IcedRTPConnector(STUN_SERVER, medias[1], defaultIf.getPublicIP())};
+        final IcedRTPConnector[] localSockets = new IcedRTPConnector[]{
+            new IcedRTPConnector(medias[0]),
+            new IcedRTPConnector(medias[1])};
+        final IcedRTPConnector[] remoteSockets = new IcedRTPConnector[]{
+            new IcedRTPConnector(medias[0]),
+            new IcedRTPConnector(medias[1])};
 
         // Create a local peer for a yet unspecified remote peer
-        IcePeerImpl localPeer = new IcePeerImpl("localPeer", AgentRole.CONTROLLING, localSockets);
-        // Set local only mode
-        localPeer.setLocalOnly(true);
+        IcePeer localPeer = IceFactory.createIcePeer("localPeer", localSockets);
         // Create a "remote" peer
-        IcePeerImpl remotePeer = new IcePeerImpl("remotePeer", AgentRole.CONTROLLED, remoteSockets);
-        // Set local only mode
-        remotePeer.setLocalOnly(true);
+        IcePeer remotePeer = IceFactory.createIcePeer("localPeer", remoteSockets);
 
         Assert.assertNotNull(localPeer.createOffer());
         // Establish the SDP connection
-        localPeer.setSdpListener(remotePeer);
-        remotePeer.setSdpListener(localPeer);
+        new LoggingSdpExchanger(localPeer,remotePeer);
 
         // Start the state machines
         localPeer.start();
@@ -74,6 +66,7 @@ public class StreamingTest extends TestCase {
             Thread.sleep(100);
         }
 
+        
         
     }
 }
