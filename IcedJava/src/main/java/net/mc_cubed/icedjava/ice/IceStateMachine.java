@@ -322,14 +322,14 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         List<Attribute> iceAttributes = getGlobalAttributes();
         List<MediaDescription> iceMedias = getMediaDescriptions();
         Connection conn = getDefaultConnection();
-        Origin origin = sdpFactory.createOrigin("-", hashCode(), 
-                new Date().getTime(), conn.getNetworkType(), 
+        Origin origin = sdpFactory.createOrigin("-", hashCode(),
+                new Date().getTime(), conn.getNetworkType(),
                 conn.getAddressType(), conn.getAddress());
 
         setSdpTimeout(false);
 
         if (sdpListener != null) {
-            sdpListener.updateMedia(origin,conn, iceAttributes, iceMedias);
+            sdpListener.updateMedia(origin, conn, iceAttributes, iceMedias);
         }
     }
 
@@ -862,7 +862,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         return this.sdpTimeout;
 //        return (new Date().getTime() - lastTouch > sdpTimeoutTime);
     }
-    
+
     /**
      * @param sdpTimeout the sdpTimeout to set
      */
@@ -1278,9 +1278,10 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         Connection connection = session.getConnection();
         List<Attribute> iceAttributes = new LinkedList<Attribute>(session.getAttributes(true));
         List<MediaDescription> medias = new LinkedList<MediaDescription>(session.getAttributes(true));
-        updateMedia(origin,connection,iceAttributes,medias);
-        
+        updateMedia(origin, connection, iceAttributes, medias);
+
     }
+
     /**
      * Takes vectors and delegates to the List version of the updateMedia method
      * 
@@ -1288,9 +1289,9 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      * @param mediaDescriptions media descriptions
      */
     @Override
-    final public void updateMedia(Origin origin,Connection conn, Vector attributes, Vector mediaDescriptions)
+    final public void updateMedia(Origin origin, Connection conn, Vector attributes, Vector mediaDescriptions)
             throws SdpParseException {
-        updateMedia(origin,conn, new LinkedList<Attribute>(attributes), new LinkedList<MediaDescription>(mediaDescriptions));
+        updateMedia(origin, conn, new LinkedList<Attribute>(attributes), new LinkedList<MediaDescription>(mediaDescriptions));
     }
 
     /**
@@ -1321,7 +1322,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             @Override
             public void run() {
                 try {
-                    _updateMedia(origin,conn, iceAttributes, iceMedias);
+                    _updateMedia(origin, conn, iceAttributes, iceMedias);
                 } catch (SdpException ex) {
                     Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, null, ex);
                 } catch (UnknownHostException ex) {
@@ -1342,9 +1343,9 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         if (lastRemoteVersion >= origin.getSessionVersion()) {
             return;
         }
-        
+
         lastRemoteVersion = origin.getSessionVersion();
-        
+
         boolean uFragChanged = false, pwdChanged = false;
         String newRemoteUFrag = null, newRemotePassword = null;
         /**
@@ -1589,7 +1590,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
             // Reset the overall ICE Status
             iceStatus = IceStatus.IN_PROGRESS;
-            
+
             if (!localControl) {
                 try {
                     // Need to emit an SDP reply, as we thought we were the
@@ -1999,8 +2000,19 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
             List<InetSocketAddress> useAddrs = new LinkedList<InetSocketAddress>();
 
-            // Select the candidates to use
+            // Check whether this socket has a complete set of candidates
+            boolean complete = false;
             if (nominated.get(socket) != null && nominated.get(socket).size() >= 1) {
+                complete = true;
+                for (CandidatePair pair : nominated.get(socket)) {
+                    if (pair == null || pair.getLocalCandidate() == null) {
+                        complete = false;
+                    }
+                }
+            }
+
+            // Return the SDP based on whether the candidates are complete or not.
+            if (complete) {
                 for (CandidatePair pair : nominated.get(socket)) {
                     if (pair == null || pair.getLocalCandidate() == null) {
                         log.log(Level.SEVERE, "Got a null local candidate, THIS IS A BUG: {0}", pair);
@@ -2046,7 +2058,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
              */
             if (socket.getMedia().getProtocol().startsWith("RTP")
                     && socket.getMedia().getPortCount() == 2
-                    && useAddrs.size() > 1 
+                    && useAddrs.size() > 1
                     && useAddrs.get(1) != null) {
                 media.getMedia().setPortCount(1);
                 media.setAttribute("rtcp", Integer.toString(useAddrs.get(1).getPort()));
