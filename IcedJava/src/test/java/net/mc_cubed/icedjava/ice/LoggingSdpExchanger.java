@@ -11,6 +11,7 @@ import java.util.logging.Logger;
 import javax.sdp.Attribute;
 import javax.sdp.Connection;
 import javax.sdp.MediaDescription;
+import javax.sdp.Origin;
 import javax.sdp.SdpParseException;
 
 /**
@@ -25,29 +26,29 @@ public class LoggingSdpExchanger {
         source1.setSdpListener(new SDPListener() {
 
             @Override
-            public void updateMedia(Connection conn, Vector iceAttributes, Vector iceMedias) throws SdpParseException {
-                log.log(Level.INFO, "{0}\n{1}\n{2}", new Object[]{conn, iceAttributes, iceMedias});
-                source2.updateMedia(conn, (List) iceAttributes, (List) iceMedias);
+            public void updateMedia(Origin origin,Connection conn, Vector iceAttributes, Vector iceMedias) throws SdpParseException {
+                log.log(Level.INFO, "{0}\n{1}\n{2}\n{3}", new Object[]{origin,conn, iceAttributes, iceMedias});
+                source2.updateMedia(origin,conn, (List) iceAttributes, (List) iceMedias);
             }
 
             @Override
-            public void updateMedia(Connection conn, List<Attribute> iceAttributes, List<MediaDescription> iceMedias) throws SdpParseException {
-                log.log(Level.INFO, "{0}\n{1}\n{2}", new Object[]{conn, iceAttributes, iceMedias});
-                source2.updateMedia(conn, iceAttributes, iceMedias);
+            public void updateMedia(Origin origin,Connection conn, List<Attribute> iceAttributes, List<MediaDescription> iceMedias) throws SdpParseException {
+                log.log(Level.INFO, "{0}\n{1}\n{2}\n{3}", new Object[]{origin,conn, iceAttributes, iceMedias});
+                source2.updateMedia(origin,conn, iceAttributes, iceMedias);
             }
         });
         source2.setSdpListener(new SDPListener() {
 
             @Override
-            public void updateMedia(Connection conn, Vector iceAttributes, Vector iceMedias) throws SdpParseException {
-                log.log(Level.INFO, "{0}\n{1}\n{2}", new Object[]{conn, iceAttributes, iceMedias});
-                source1.updateMedia(conn, (List) iceAttributes, (List) iceMedias);
+            public void updateMedia(Origin origin,Connection conn, Vector iceAttributes, Vector iceMedias) throws SdpParseException {
+                log.log(Level.INFO, "{0}\n{1}\n{2}\n{3}", new Object[]{origin,conn, iceAttributes, iceMedias});
+                source1.updateMedia(origin,conn, (List) iceAttributes, (List) iceMedias);
             }
 
             @Override
-            public void updateMedia(Connection conn, List<Attribute> iceAttributes, List<MediaDescription> iceMedias) throws SdpParseException {
-                log.log(Level.INFO, "{0}\n{1}\n{2}", new Object[]{conn, iceAttributes, iceMedias});
-                source1.updateMedia(conn, iceAttributes, iceMedias);
+            public void updateMedia(Origin origin,Connection conn, List<Attribute> iceAttributes, List<MediaDescription> iceMedias) throws SdpParseException {
+                log.log(Level.INFO, "{0}\n{1}\n{2}\n{3}", new Object[]{origin,conn, iceAttributes, iceMedias});
+                source1.updateMedia(origin,conn, iceAttributes, iceMedias);
             }
         });
     }

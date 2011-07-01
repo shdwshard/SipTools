@@ -138,7 +138,10 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
     @Override
     public int read(ByteBuffer dst) throws IOException {
         ByteBuffer src = queue.poll();
-        dst.put(src);
+        // If the source buffer is null, don't write anything, only flip the buffer
+        if (src != null) {
+            dst.put(src);
+        }
         dst.flip();
         return dst.remaining();
     }
@@ -161,7 +164,7 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
             SocketAddress address = bytesEvent.getChannel().receive(buffer);
             if (address != null) {
                 queue.add(buffer);
-                fireEvent(new BytesAvailableEventImpl(this));
+                fireEvent(new BytesAvailableEventImpl(this, peer));
             }
         }
     }

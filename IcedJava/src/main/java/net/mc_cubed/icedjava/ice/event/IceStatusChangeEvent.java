@@ -19,22 +19,10 @@
  */
 package net.mc_cubed.icedjava.ice.event;
 
-import net.mc_cubed.icedjava.ice.IceSocketChannel;
-
 /**
- * IceBytesAvailableEvent indicates that data has been received on a socket
- * channel, and can be read immediately.
  *
- * @author Charles Chappell
- * @since 1.0
+ * @author charles
  */
-public interface IceBytesAvailableEvent extends IceEvent {
-
-    /**
-     * Get the socket channel with data available for reading.
-     * 
-     * @return The IceSocketChannel which is ready for reading
-     */
-    IceSocketChannel getSocketChannel();
+public interface IceStatusChangeEvent extends IceProgressEvent {
     
 }

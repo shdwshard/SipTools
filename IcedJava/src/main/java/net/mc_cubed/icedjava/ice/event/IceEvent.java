@@ -19,6 +19,8 @@
  */
 package net.mc_cubed.icedjava.ice.event;
 
+import net.mc_cubed.icedjava.ice.IcePeer;
+
 /**
  * IceEvent is a superclass for all Ice Event classes.
  *
@@ -28,4 +30,10 @@ package net.mc_cubed.icedjava.ice.event;
  */
 public interface IceEvent {
     
+    /**
+     * Get the ICE Peer this event pertains to
+     * 
+     * @return The IcePeer this event pertains to
+     */
+    public IcePeer getIcePeer();
 }

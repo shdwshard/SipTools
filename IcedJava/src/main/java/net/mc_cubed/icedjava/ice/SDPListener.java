@@ -24,6 +24,7 @@ import java.util.Vector;
 import javax.sdp.Attribute;
 import javax.sdp.Connection;
 import javax.sdp.MediaDescription;
+import javax.sdp.Origin;
 import javax.sdp.SdpParseException;
 
 /**
@@ -44,12 +45,13 @@ public interface SDPListener {
      * for an IcePeer, hence this method allows only the relevant information to
      * be sent, and the receiving class to use only the relevant information
      * 
+     * @param origin The O line of the SDP description
      * @param conn The C line of the SDP description
      * @param iceAttributes global A lines used during ICE negociation
      * @param iceMedias M lines used during ICE processing
      * @throws SdpParseException 
      */
-    public void updateMedia(Connection conn,Vector iceAttributes, Vector iceMedias)
+    public void updateMedia(Origin origin,Connection conn,Vector iceAttributes, Vector iceMedias)
             throws SdpParseException;
 
     /**
@@ -59,12 +61,13 @@ public interface SDPListener {
      * for an IcePeer, hence this method allows only the relevant information to
      * be sent, and the receiving class to use only the relevant information
      * 
+     * @param origin The O line of the SDP description
      * @param conn The C line of the SDP description
      * @param iceAttributes global A lines used during ICE negociation
      * @param iceMedias M lines used during ICE processing
      * @throws SdpParseException 
      */
-    public void updateMedia(Connection conn,List<Attribute> iceAttributes, List<MediaDescription> iceMedias)
+    public void updateMedia(Origin origin,Connection conn,List<Attribute> iceAttributes, List<MediaDescription> iceMedias)
             throws SdpParseException;
 
 }

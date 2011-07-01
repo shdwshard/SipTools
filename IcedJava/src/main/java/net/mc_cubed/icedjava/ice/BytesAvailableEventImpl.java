@@ -28,13 +28,20 @@ import net.mc_cubed.icedjava.ice.event.IceBytesAvailableEvent;
 class BytesAvailableEventImpl implements IceBytesAvailableEvent {
 
     final IceSocketChannel socketChannel;
+    final IcePeer peer;
 
-    BytesAvailableEventImpl(IceSocketChannel socketChannel) {
+    BytesAvailableEventImpl(IceSocketChannel socketChannel,IcePeer peer) {
         this.socketChannel = socketChannel;
+        this.peer = peer;
     }
 
     @Override
     public IceSocketChannel getSocketChannel() {
         return socketChannel;
+    }
+
+    @Override
+    public IcePeer getIcePeer() {
+        return peer;
     }
 }

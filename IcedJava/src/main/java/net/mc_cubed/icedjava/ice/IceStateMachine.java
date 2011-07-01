@@ -57,6 +57,7 @@ import javax.sdp.Attribute;
 import javax.sdp.Connection;
 import javax.sdp.Media;
 import javax.sdp.MediaDescription;
+import javax.sdp.Origin;
 import javax.sdp.SdpException;
 import javax.sdp.SdpFactory;
 import javax.sdp.SdpParseException;
@@ -149,6 +150,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     Instance<CandidateDiscovery> localCandidateDiscoveryMechs;
     boolean localOnly = false;
     boolean sendKeepalives = false;
+    private long lastRemoteVersion = 0;
 
     @Override
     protected void finalize() throws Throwable {
@@ -320,11 +322,14 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         List<Attribute> iceAttributes = getGlobalAttributes();
         List<MediaDescription> iceMedias = getMediaDescriptions();
         Connection conn = getDefaultConnection();
+        Origin origin = sdpFactory.createOrigin("-", hashCode(), 
+                new Date().getTime(), conn.getNetworkType(), 
+                conn.getAddressType(), conn.getAddress());
 
         setSdpTimeout(false);
 
         if (sdpListener != null) {
-            sdpListener.updateMedia(conn, iceAttributes, iceMedias);
+            sdpListener.updateMedia(origin,conn, iceAttributes, iceMedias);
         }
     }
 
@@ -1266,6 +1271,16 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
     }
 
+    @Override
+    final public void updateMedia(String sdpText) throws SdpParseException {
+        SessionDescription session = sdpFactory.createSessionDescription(sdpText);
+        Origin origin = session.getOrigin();
+        Connection connection = session.getConnection();
+        List<Attribute> iceAttributes = new LinkedList<Attribute>(session.getAttributes(true));
+        List<MediaDescription> medias = new LinkedList<MediaDescription>(session.getAttributes(true));
+        updateMedia(origin,connection,iceAttributes,medias);
+        
+    }
     /**
      * Takes vectors and delegates to the List version of the updateMedia method
      * 
@@ -1273,9 +1288,9 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      * @param mediaDescriptions media descriptions
      */
     @Override
-    final public void updateMedia(Connection conn, Vector attributes, Vector mediaDescriptions)
+    final public void updateMedia(Origin origin,Connection conn, Vector attributes, Vector mediaDescriptions)
             throws SdpParseException {
-        updateMedia(conn, new LinkedList<Attribute>(attributes), new LinkedList<MediaDescription>(mediaDescriptions));
+        updateMedia(origin,conn, new LinkedList<Attribute>(attributes), new LinkedList<MediaDescription>(mediaDescriptions));
     }
 
     /**
@@ -1287,7 +1302,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      * @throws SdpException
      */
     @Override
-    public void updateMedia(final Connection conn, final List<Attribute> iceAttributes, final List<MediaDescription> iceMedias)
+    public void updateMedia(final Origin origin, final Connection conn, final List<Attribute> iceAttributes, final List<MediaDescription> iceMedias)
             throws SdpParseException {
         log.log(Level.FINE, "SDP Update to {0}\n{1}\n{2}", new Object[]{localUFrag, iceAttributes, iceMedias});
         /**
@@ -1306,7 +1321,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             @Override
             public void run() {
                 try {
-                    _updateMedia(conn, iceAttributes, iceMedias);
+                    _updateMedia(origin,conn, iceAttributes, iceMedias);
                 } catch (SdpException ex) {
                     Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, null, ex);
                 } catch (UnknownHostException ex) {
@@ -1318,9 +1333,18 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         });
     }
 
-    synchronized void _updateMedia(Connection conn, List<Attribute> iceAttributes, List<MediaDescription> iceMedias)
+    synchronized void _updateMedia(Origin origin, Connection conn, List<Attribute> iceAttributes, List<MediaDescription> iceMedias)
             throws SdpParseException, SdpException, UnknownHostException {
 
+        /**
+         * Fast abort: If we got a duplicate, or old session, end here.
+         */
+        if (lastRemoteVersion >= origin.getSessionVersion()) {
+            return;
+        }
+        
+        lastRemoteVersion = origin.getSessionVersion();
+        
         boolean uFragChanged = false, pwdChanged = false;
         String newRemoteUFrag = null, newRemotePassword = null;
         /**
@@ -1476,8 +1500,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      *
      * @param remotePassword
      */
-    @Override
-    public void setRemotePassword(String remotePassword) {
+    protected void setRemotePassword(String remotePassword) {
         this.remotePassword = remotePassword;
     }
 
@@ -1496,8 +1519,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      *
      * @param remoteUFrag
      */
-    @Override
-    public void setRemoteUFrag(String remoteUFrag) {
+    protected void setRemoteUFrag(String remoteUFrag) {
         this.remoteUFrag = remoteUFrag;
     }
 

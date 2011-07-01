@@ -25,6 +25,7 @@ import java.util.Vector;
 import javax.sdp.Attribute;
 import javax.sdp.Connection;
 import javax.sdp.MediaDescription;
+import javax.sdp.Origin;
 import javax.sdp.SdpParseException;
 
 /**
@@ -36,10 +37,10 @@ import javax.sdp.SdpParseException;
  */
 public interface MultiSDPListener {
 
-    public void updateMedia(Connection conn,Vector iceAttributes, Vector iceMedias, IcePeer fromPeer)
+    public void updateMedia(Origin origin,Connection conn,Vector iceAttributes, Vector iceMedias, IcePeer fromPeer)
             throws SdpParseException;
 
-    public void updateMedia(Connection conn,List<Attribute> iceAttributes, List<MediaDescription> iceMedias, IcePeer fromPeer)
+    public void updateMedia(Origin origin,Connection conn,List<Attribute> iceAttributes, List<MediaDescription> iceMedias, IcePeer fromPeer)
             throws SdpParseException;
 
 

@@ -26,6 +26,7 @@ import java.util.Map;
 import javax.sdp.Attribute;
 import javax.sdp.MediaDescription;
 import javax.sdp.SdpException;
+import javax.sdp.SdpParseException;
 import javax.sdp.SessionDescription;
 import org.glassfish.grizzly.filterchain.Filter;
 
@@ -95,18 +96,6 @@ public interface IcePeer extends SDPListener, Filter {
     long getTieBreaker();
 
     /**
-     * Sets or updates the remote password in use by this peer
-     * @param remotePassword new remote password for peer
-     */
-    void setRemotePassword(String remotePassword);
-
-    /**
-     * Sets or updates the remote uFrag in use by this peer
-     * @param remoteUFrag new remote uFrag for peer
-     */
-    void setRemoteUFrag(String remoteUFrag);
-
-    /**
      * Sets an SDP Listener for this peer, which can be used to send updated
      * offers as part of the ICE process
      * @param sdpListener
@@ -169,8 +158,15 @@ public interface IcePeer extends SDPListener, Filter {
      * Does this peer have a matching remote address for the given socket address?
      * @param address Socket address to test
      * @param socket Socket to match against, or null to test all
-     * @param componentId component id to match against or null if none
+     * @param componentId component id to match against or null to test all
      * @return true if the given remote address matches this peer
      */
     public boolean hasRemoteAddress(SocketAddress address, IceSocket socket, Short componentId);
+    
+    /**
+     * A convenience method which takes a textual SDP descriptor, then parses 
+     * and delivers the results to the appropriate updateMedia() method.
+     * @param sdpText 
+     */  
+    public void updateMedia(String sdpText) throws SdpParseException;
 }
