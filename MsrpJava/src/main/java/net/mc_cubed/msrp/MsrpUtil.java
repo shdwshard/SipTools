@@ -1,6 +1,6 @@
 package net.mc_cubed.msrp;
 
-import com.sun.org.apache.xml.internal.security.utils.Base64;
+import org.apache.commons.codec.binary.Base64;
 import java.security.SecureRandom;
 import java.util.LinkedList;
 import java.util.List;
@@ -74,7 +74,7 @@ public class MsrpUtil {
         SecureRandom secure = new SecureRandom();
         byte[] bytes = new byte[MSRP_URI_SESSION_LENGTH];
         secure.nextBytes(bytes);
-        return Base64.encode(bytes,0);
+        return Base64.encodeBase64String(bytes);
     }
     /**
      * Number of bytes to use when generating a transaction identifier
@@ -100,7 +100,7 @@ public class MsrpUtil {
         SecureRandom secure = new SecureRandom();
         byte[] bytes = new byte[MSRP_TX_ID_LENGTH];
         secure.nextBytes(bytes);
-        return Base64.encode(bytes,0);
+        return Base64.encodeBase64String(bytes);
     }
 
     public static final String MSRP_SDP_MEDIA_TYPE = "message";

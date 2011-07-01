@@ -10,7 +10,7 @@
     <groupId>net.mc_cubed</groupId>
     <artifactId>MsrpJava</artifactId>
     <packaging>jar</packaging>
-    <version>1.0-SNAPSHOT</version>
+    <version>${project.parent.version}</version>
     <name>MsrpJava</name>
     <url>http://maven.apache.org</url>
     <build>
@@ -101,6 +101,11 @@
             <groupId>org.jboss.weld</groupId>
             <artifactId>weld-se</artifactId>
             <version>1.0.1-Final</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+            <version>1.4</version>
         </dependency>
     </dependencies>
     <properties>
