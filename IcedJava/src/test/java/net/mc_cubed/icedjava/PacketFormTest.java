@@ -26,33 +26,19 @@ import net.mc_cubed.icedjava.packet.header.MessageMethod;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import junit.framework.Assert;
-import junit.framework.TestCase;
 import net.mc_cubed.icedjava.packet.StunPacket;
 import net.mc_cubed.icedjava.packet.attribute.AttributeFactory;
 import net.mc_cubed.icedjava.stun.StunUtil;
+import org.junit.Assert;
+import org.junit.Test;
 
 /**
  *
  * @author Charles Chappell
  */
-public class PacketFormTest extends TestCase {
+public class PacketFormTest {
 
-    public PacketFormTest(String testName) {
-        super(testName);
-    }
-
-    @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-    }
-
-    @Override
-    protected void tearDown() throws Exception {
-        super.tearDown();
-    }
-
-    // TODO add test methods here. The name must begin with 'test'. For example:
+    @Test
     public void testBasicPacket() throws UnknownHostException, UnsupportedEncodingException {
 
         StunPacket packet = StunUtil.createStunRequest(MessageClass.REQUEST, MessageMethod.BINDING);

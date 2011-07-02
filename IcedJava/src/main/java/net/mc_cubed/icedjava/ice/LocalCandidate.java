@@ -55,7 +55,7 @@ public class LocalCandidate extends Candidate {
         // Use a hashcode of the above to shorten, and not leak too much information
         return String.valueOf(Math.abs(foundation.hashCode()));
     }
-
+    
     public LocalCandidate(IcePeer owner, IceSocket iceSocket, CandidateType type, DemultiplexerSocket socket) {
         this(owner, iceSocket, type, socket, (short) 0);
     }

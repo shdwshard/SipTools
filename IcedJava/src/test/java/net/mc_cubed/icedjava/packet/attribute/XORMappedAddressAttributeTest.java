@@ -26,31 +26,27 @@ import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import junit.framework.Assert;
-import junit.framework.TestCase;
 import net.mc_cubed.icedjava.ice.IceUtil;
 import net.mc_cubed.icedjava.ice.InterfaceProfile;
 import net.mc_cubed.icedjava.packet.header.MessageHeader;
 import net.mc_cubed.icedjava.stun.StunUtil;
 import net.mc_cubed.icedjava.util.StringUtils;
+import org.junit.Test;
 
 /**
  *
  * @author Charles Chappell
  * @since 0.9
  */
-public class XORMappedAddressAttributeTest extends TestCase {
+public class XORMappedAddressAttributeTest {
 
     Logger log = Logger.getLogger(XORMappedAddressAttributeTest.class.getName());
 
-    public XORMappedAddressAttributeTest(String testName) {
-        super(testName);
+    public XORMappedAddressAttributeTest() {
     }
 
-    @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-    }
 
+    @Test
     public void testXOR() {
         InetSocketAddress stunServer = StunUtil.getStunServerSocket();
 

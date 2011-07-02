@@ -59,6 +59,7 @@ public class UDPCandidateDiscovery implements CandidateDiscovery {
                     while (ifaces.hasMoreElements()) {
                         NetworkInterface iface = ifaces.nextElement();
 
+                        
                         Enumeration<InetAddress> addresses = iface.getInetAddresses();
                         while (addresses.hasMoreElements()) {
                             InetAddress address = addresses.nextElement();
