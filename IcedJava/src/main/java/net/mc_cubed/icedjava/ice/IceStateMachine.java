@@ -596,33 +596,56 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                 synchronized (pair) {
                     IceReply result = pair.getReplyFuture().get();
                     if (result.isSuccess()) {
-                        pair.setState(PairState.SUCCEEDED);
 
                         // Check for a Peer Reflexive Candidate
                         InetSocketAddress mappedAddress = result.getMappedAddress();
                         List<LocalCandidate> lclist = socketCandidateMap.get(socket);
-                        boolean matched = false;
-                        for (LocalCandidate candidate : lclist) {
-                            if (candidate.getSocketAddress().equals(mappedAddress)) {
-                                matched = true;
-                                break;
+
+                        /**
+                         * Check whether the reply address matched the address 
+                         *  we thought it was sent from.  If not, this test did
+                         *  not succeed, and might generate a reflexive pair.
+                         */
+                        if (!mappedAddress.getAddress().getHostAddress().equalsIgnoreCase(pair.getLocalCandidate().getAddress().getHostAddress())
+                                || mappedAddress.getPort() != pair.getLocalCandidate().getPort()) {
+                            pair.setState(PairState.FAILED);
+                            log.log(Level.INFO, "Test failed due to mismatching Address.  Expected {0} but got {1}", new Object[]{pair.getLocalCandidate().getSocketAddress(), mappedAddress});
+
+                            /**
+                             * Search for a matching pair.  We should set any 
+                             * matching pairs to success as an optimization.
+                             */
+                            boolean matched = false;
+                            for (LocalCandidate candidate : lclist) {
+                                if (mappedAddress.getAddress().getHostAddress().equalsIgnoreCase(candidate.getAddress().getHostAddress())
+                                        && mappedAddress.getPort() == candidate.getPort()) {
+                                    matched = true;
+                                    break;
+                                }
                             }
-                        }
 
-                        if (!matched) {
-                            // Generate a peer reflexive candidate, mark it succeeded and add it to the list
-                            LocalCandidate local = new LocalCandidate(
-                                    pair.getLocalCandidate().getOwner(),
-                                    pair.getLocalCandidate().getIceSocket(),
-                                    CandidateType.PEER_REFLEXIVE,
-                                    mappedAddress.getAddress(),
-                                    mappedAddress.getPort(), pair.getLocalCandidate());
-                            CandidatePair peerReflexPair = new CandidatePair(local, pair.getRemoteCandidate(), isLocalControlled());
-                            peerReflexPair.setState(PairState.SUCCEEDED);
-                            log.log(Level.FINE, "New peer reflexive pair: {0} <-> {1}", new Object[]{peerReflexPair.getLocalCandidate().getSocketAddress(), peerReflexPair.getRemoteCandidate().getSocketAddress()});
+                            /**
+                             * If we didn't match any candidates, then create a
+                             *  a peer reflexive candidate to represent this 
+                             *  result.
+                             */
+                            if (!matched) {
+                                // Generate a peer reflexive candidate, mark it succeeded and add it to the list
+                                LocalCandidate local = new LocalCandidate(
+                                        pair.getLocalCandidate().getOwner(),
+                                        pair.getLocalCandidate().getIceSocket(),
+                                        CandidateType.PEER_REFLEXIVE,
+                                        mappedAddress.getAddress(),
+                                        mappedAddress.getPort(), pair.getLocalCandidate());
+                                CandidatePair peerReflexPair = new CandidatePair(local, pair.getRemoteCandidate(), isLocalControlled());
+                                peerReflexPair.setState(PairState.SUCCEEDED);
+                                log.log(Level.FINE, "New peer reflexive pair: {0} <-> {1}", new Object[]{peerReflexPair.getLocalCandidate().getSocketAddress(), peerReflexPair.getRemoteCandidate().getSocketAddress()});
 
-                            checkPairs.get(socket).add(peerReflexPair);
+                                checkPairs.get(socket).add(peerReflexPair);
+                            }
                         } else {
+                            pair.setState(PairState.SUCCEEDED);
+
                             // Unfreeze other pairs with the same foundation
                             for (IceSocket updateSocket : checkPairs.keySet()) {
                                 for (CandidatePair candidate : checkPairs.get(updateSocket)) {
@@ -1168,14 +1191,14 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
     private void remoteTouch(final InetSocketAddress localSocket, final InetSocketAddress remoteSocket) {
         // Check for an existing check pair
-        CandidatePair pair = null;
+        List<CandidatePair> pairs = new LinkedList<CandidatePair>();
         LocalCandidate local = null;
         for (List<CandidatePair> localCheckPairs : checkPairs.values()) {
             for (CandidatePair checkPair : localCheckPairs) {
                 if (checkPair.getLocalCandidate().getSocketAddress().equals(localSocket)) {
                     local = checkPair.getLocalCandidate();
                     if (checkPair.getRemoteCandidate().getSocketAddress().equals(remoteSocket)) {
-                        pair = checkPair;
+                        pairs.add(checkPair);
                         break;
                     }
                 }
@@ -1186,16 +1209,18 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             // TODO: Unknown use candidate!
             log.log(Level.WARNING, "Unknown stun touch on socket: " + "{0} <-> {1}", new Object[]{localSocket, remoteSocket});
         } else {
-            if (pair != null) {
-                if (pair.getState() == PairState.FROZEN
-                        || pair.getState() == PairState.FAILED) {
-                    pair.setState(PairState.WAITING);
-                    triggeredCheckQueue.offer(pair);
+            if (!pairs.isEmpty()) {
+                for (CandidatePair pair : pairs) {
+                    if (pair.getState() == PairState.FROZEN
+                            || pair.getState() == PairState.FAILED) {
+                        pair.setState(PairState.WAITING);
+                        triggeredCheckQueue.offer(pair);
+                    }
                 }
             } else {
                 // Form the remote candidate using the local for reference
                 RemoteCandidate remote = new RemoteCandidate(CandidateType.PEER_REFLEXIVE, remoteSocket.getAddress(), remoteSocket.getPort(), local.getComponentId(), local.getTransport(), local.getFoundation());
-                pair = new CandidatePair(local, remote, isLocalControlled());
+                CandidatePair pair = new CandidatePair(local, remote, isLocalControlled());
                 pair.setState(PairState.SUCCEEDED);
                 if (checkPairs.get(local.getIceSocket()) != null) {
                     checkPairs.get(local.getIceSocket()).add(pair);
@@ -2406,8 +2431,10 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         remotePassword = null;
 
         iceStatus = IceStatus.IN_PROGRESS;
+
         checkPairs.clear();
         triggeredCheckQueue.clear();
+
         if (resetPeer) {
             localUFrag = generateHashString(UFRAG_LENGTH);
             localPassword = generateHashString(PASSWORD_LENGTH);
@@ -2420,9 +2447,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
         setLocalControlled(localControl);
 
-        if (isLocalControlled()) {
-            sendSessionUpdate();
-        }
+        sendSessionUpdate();
 
     }
 
