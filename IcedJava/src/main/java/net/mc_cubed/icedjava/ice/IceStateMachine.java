@@ -110,7 +110,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     private String localPassword;
     private String remoteUFrag;
     private String remotePassword;
-    private Logger log = Logger.getLogger(IceStateMachine.class.getName());
+    private static final Logger log = Logger.getLogger(IceStateMachine.class.getName());
     private int iceInterval = 500;
     private ScheduledFuture task = null;
     private long lastSent = 0;
@@ -140,7 +140,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     private final long tieBreaker;
     protected static SecureRandom random = new SecureRandom();
     protected final Map<IceSocket, List<CandidatePair>> nominated = new HashMap<IceSocket, List<CandidatePair>>();
-    protected final Map<IceSocket, List<CandidatePair>> using = new HashMap<IceSocket, List<CandidatePair>>();
+    protected final Map<IceSocket, List<CandidatePair>> selectedPairs = new HashMap<IceSocket, List<CandidatePair>>();
     protected final List<InterfaceProfile> interfaceData;
     @Inject
     @DiscoveryMechanism
@@ -153,6 +153,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     private long lastRemoteVersion = 0;
 
     @Override
+    @SuppressWarnings("FinalizeDeclaration")
     protected void finalize() throws Throwable {
         super.finalize();
         getThreadpool().shutdownNow();
@@ -214,8 +215,8 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         return nominated;
     }
 
-    public Map<IceSocket, List<CandidatePair>> getUsing() {
-        return using;
+    public Map<IceSocket, List<CandidatePair>> getSelectedPairs() {
+        return selectedPairs;
     }
 
     /**
@@ -543,7 +544,13 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
                                     }
                                 } else {
-                                    log.log(Level.WARNING, "Got a null reply from an ICE test during keepalive.  This is abnormal. {0}:{1} -> {2}:{3} - {4}", new Object[]{pair.getLocalCandidate().getAddress(), pair.getLocalCandidate().getPort(), pair.getRemoteCandidate().getAddress(), pair.getRemoteCandidate().getPort(), pair.getState()});
+                                    log.log(Level.WARNING, "Got a null reply from an ICE test during keepalive.  "
+                                            + "This is abnormal. {0}:{1} -> {2}:{3} - {4}",
+                                            new Object[]{pair.getLocalCandidate().getAddress(),
+                                                pair.getLocalCandidate().getPort(),
+                                                pair.getRemoteCandidate().getAddress(),
+                                                pair.getRemoteCandidate().getPort(),
+                                                pair.getState()});
                                 }
 
                             }
@@ -611,7 +618,8 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                         if (!mappedAddress.getAddress().getHostAddress().equalsIgnoreCase(pair.getLocalCandidate().getAddress().getHostAddress())
                                 || mappedAddress.getPort() != pair.getLocalCandidate().getPort()) {
                             pair.setState(PairState.FAILED);
-                            log.log(Level.INFO, "Test failed due to mismatching Address.  Expected {0} but got {1}", new Object[]{pair.getLocalCandidate().getSocketAddress(), mappedAddress});
+                            log.log(Level.INFO, "Test failed due to mismatching Address.  Expected {0} but got {1}",
+                                    new Object[]{pair.getLocalCandidate().getSocketAddress(), mappedAddress});
 
                             /**
                              * Search for a matching pair.  We should set any 
@@ -641,7 +649,9 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                                         mappedAddress.getPort(), pair.getLocalCandidate());
                                 CandidatePair peerReflexPair = new CandidatePair(local, pair.getRemoteCandidate(), isLocalControlled());
                                 peerReflexPair.setState(PairState.SUCCEEDED);
-                                log.log(Level.FINE, "New peer reflexive pair: {0} <-> {1}", new Object[]{peerReflexPair.getLocalCandidate().getSocketAddress(), peerReflexPair.getRemoteCandidate().getSocketAddress()});
+                                log.log(Level.FINE, "New peer reflexive pair: {0} <-> {1}", new Object[]{
+                                            peerReflexPair.getLocalCandidate().getSocketAddress(),
+                                            peerReflexPair.getRemoteCandidate().getSocketAddress()});
 
                                 checkPairs.get(socket).add(peerReflexPair);
                             }
@@ -703,8 +713,14 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                         }
                         pair.setState(PairState.FAILED);
                     }
-                    log.log(Level.FINE, "{0}:{1} -> {2}:{3} - {4} - {5}", new Object[]{pair.getLocalCandidate().getAddress(), pair.getLocalCandidate().getPort(), pair.getRemoteCandidate().getAddress(), pair.getRemoteCandidate().getPort(), pair.getState(), (result.isSuccess()) ? result.getMappedAddress() : result.getErrorReason()});
+                    log.log(Level.FINE, "{0}:{1} -> {2}:{3} - {4} - {5}", new Object[]{
+                                pair.getLocalCandidate().getAddress(),
+                                pair.getLocalCandidate().getPort(),
+                                pair.getRemoteCandidate().getAddress(),
+                                pair.getRemoteCandidate().getPort(), pair.getState(),
+                                (result.isSuccess()) ? result.getMappedAddress() : result.getErrorReason()});
                 }
+
             } catch (ExecutionException ex) {
                 log.log(Level.WARNING, "Caught an exception on a finished future.  This is probably a bug", ex);
             } catch (InterruptedException ex) {
@@ -758,7 +774,9 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                                     mappedAddress.getPort(), pair.getLocalCandidate());
                             CandidatePair peerReflexPair = new CandidatePair(local, pair.getRemoteCandidate(), isLocalControlled());
                             peerReflexPair.setState(PairState.SUCCEEDED);
-                            log.log(Level.FINE, "New peer reflexive pair: {0} <-> {1}", new Object[]{peerReflexPair.getLocalCandidate().getSocketAddress(), peerReflexPair.getRemoteCandidate().getSocketAddress()});
+                            log.log(Level.FINE, "New peer reflexive pair: {0} <-> {1}", new Object[]{
+                                        peerReflexPair.getLocalCandidate().getSocketAddress(),
+                                        peerReflexPair.getRemoteCandidate().getSocketAddress()});
 
                             checkPairs.get(socket).add(peerReflexPair);
                         } else {
@@ -818,7 +836,13 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                         }
                         pair.setState(PairState.FAILED);
                     }
-                    log.log(Level.FINE, "{0}:{1} -> {2}:{3} - {4} - {5}", new Object[]{pair.getLocalCandidate().getAddress(), pair.getLocalCandidate().getPort(), pair.getRemoteCandidate().getAddress(), pair.getRemoteCandidate().getPort(), pair.getState(), (result.isSuccess()) ? result.getMappedAddress() : result.getErrorReason()});
+                    log.log(Level.FINE, "{0}:{1} -> {2}:{3} - {4} - {5}", new Object[]{
+                                pair.getLocalCandidate().getAddress(),
+                                pair.getLocalCandidate().getPort(),
+                                pair.getRemoteCandidate().getAddress(),
+                                pair.getRemoteCandidate().getPort(),
+                                pair.getState(),
+                                (result.isSuccess()) ? result.getMappedAddress() : result.getErrorReason()});
                 }
             }
         } catch (InterruptedException ex) {
@@ -1033,14 +1057,14 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             }
 
         }
-        
+
         // Note the time we received this packet 
         lastTouch = new Date().getTime();
 
         // Check whether this is a nomination request, and we're the controlled peer
         if (attrMap.containsKey(AttributeType.USE_CANDIDATE) && !isLocalControlled()) {
             // Nominate this candidate with the peer
-            setUseCandidate(
+            setNominatedCandidate(
                     (InetSocketAddress) ctx.getConnection().getLocalAddress(),
                     (InetSocketAddress) sourceAddress);
         }
@@ -1212,7 +1236,8 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
         if (local == null) {
             // TODO: Unknown use candidate!
-            log.log(Level.WARNING, "Unknown stun touch on socket: " + "{0} <-> {1}", new Object[]{localSocket, remoteSocket});
+            log.log(Level.WARNING, "Unknown stun touch on socket: " + "{0} <-> {1}",
+                    new Object[]{localSocket, remoteSocket});
         } else {
             if (!pairs.isEmpty()) {
                 for (CandidatePair pair : pairs) {
@@ -1224,7 +1249,13 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                 }
             } else {
                 // Form the remote candidate using the local for reference
-                RemoteCandidate remote = new RemoteCandidate(CandidateType.PEER_REFLEXIVE, remoteSocket.getAddress(), remoteSocket.getPort(), local.getComponentId(), local.getTransport(), local.getFoundation());
+                RemoteCandidate remote = new RemoteCandidate(
+                        CandidateType.PEER_REFLEXIVE,
+                        remoteSocket.getAddress(),
+                        remoteSocket.getPort(),
+                        local.getComponentId(),
+                        local.getTransport(),
+                        local.getFoundation());
                 CandidatePair pair = new CandidatePair(local, remote, isLocalControlled());
                 pair.setState(PairState.SUCCEEDED);
                 if (checkPairs.get(local.getIceSocket()) != null) {
@@ -1257,7 +1288,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                         // Replace the contents of the Using sockets with the
                         // nominated pairs.  This usage method supports hot
                         // re-negociation.
-                        using.putAll(nominated);
+                        selectedPairs.putAll(nominated);
                         // TODO: Shut down unused sockets, preserving only the used
                         // socket pairs
                     } else {
@@ -1834,13 +1865,27 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                         ? media.getConnection().getAddress()
                         : remoteConnection.getAddress());
 
-                candidateList.add(new RemoteCandidate(
-                        CandidateType.LOCAL,
-                        InetAddress.getByName(remoteAddr),
-                        media.getMedia().getMediaPort(),
-                        (short) 0,
-                        tt,
-                        "1"));
+                short component = 0;
+                for (component = 0; component < media.getMedia().getPortCount(); component++) {
+                    candidateList.add(new RemoteCandidate(
+                            CandidateType.LOCAL,
+                            InetAddress.getByName(remoteAddr),
+                            media.getMedia().getMediaPort() + component,
+                            component,
+                            tt,
+                            "1"));
+                }
+
+                if (media.getAttribute("rtcp") != null) {
+                    // Add an RTCP matching attribute
+                    candidateList.add(new RemoteCandidate(
+                            CandidateType.LOCAL,
+                            InetAddress.getByName(remoteAddr),
+                            Integer.valueOf(media.getAttribute("rtcp")),
+                            component,
+                            tt,
+                            "1"));
+                }
             }
             retval.put(media, candidateList);
         }
@@ -1980,7 +2025,12 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
             // Convert the Media line to a MediaDescription
             Media rawMedia = socket.getMedia();
-            MediaDescription media = sdpFactory.createMediaDescription(rawMedia.getMediaType(), rawMedia.getMediaPort(), rawMedia.getPortCount(), rawMedia.getProtocol(), stringVectorToArray(rawMedia.getMediaFormats(false)));
+            MediaDescription media = sdpFactory.createMediaDescription(
+                    rawMedia.getMediaType(),
+                    rawMedia.getMediaPort(),
+                    rawMedia.getPortCount(),
+                    rawMedia.getProtocol(),
+                    stringVectorToArray(rawMedia.getMediaFormats(false)));
             // Remove all the candidates
             List<Attribute> checkAttrs = new LinkedList<Attribute>();
 
@@ -2232,7 +2282,6 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                 }
 
             }
-
         }
 
         return matchCandidates;
@@ -2327,7 +2376,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      * @param localSocket Local channel address to nominate
      * @param remoteSocket Remote channel address to nominate
      */
-    void setUseCandidate(InetSocketAddress localSocket, InetSocketAddress remoteSocket) {
+    void setNominatedCandidate(InetSocketAddress localSocket, InetSocketAddress remoteSocket) {
         //Set this target as the use case.
         // Check for an existing check pair
         CandidatePair pair = null;
@@ -2347,6 +2396,21 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             }
         }
 
+        /**
+         * Drastic measures: Use the list of all local candidates
+         */
+        if (local == null) {
+            for (Entry<IceSocket, List<LocalCandidate>> socketCandidate : socketCandidateMap.entrySet()) {
+                for (LocalCandidate checkCandidate : socketCandidate.getValue()) {
+                    if (checkCandidate.getSocketAddress().equals(localSocket)) {
+                        log.log(Level.WARNING, "Resorted to SocketMap to find candidate for: {0} <-> {1}", new Object[]{localSocket, remoteSocket});
+                        local = checkCandidate;
+                        break;
+                    }
+                }
+            }
+
+        }
         if (local == null) {
             // TODO: Unknown use candidate!
             log.log(Level.WARNING, "Request to nominate an unknown socket: {0} <-> {1}", new Object[]{localSocket, remoteSocket});
@@ -2356,7 +2420,8 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             if (pair != null) {
                 synchronized (nominated) {
                     if (!nominated.containsKey(pair.getLocalCandidate().getIceSocket())) {
-                        nominated.put(pair.getLocalCandidate().getIceSocket(), new ArrayList<CandidatePair>(pair.getLocalCandidate().getIceSocket().getComponents()));
+                        nominated.put(pair.getLocalCandidate().getIceSocket(),
+                                new ArrayList<CandidatePair>(pair.getLocalCandidate().getIceSocket().getComponents()));
                         for (int i = 0; i < pair.getLocalCandidate().getIceSocket().getComponents(); i++) {
                             nominated.get(pair.getLocalCandidate().getIceSocket()).add(null);
                         }
@@ -2368,13 +2433,20 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
             } else {
                 // Form the remote candidate using the local for reference
-                RemoteCandidate remote = new RemoteCandidate(CandidateType.PEER_REFLEXIVE, remoteSocket.getAddress(), remoteSocket.getPort(), local.getComponentId(), local.getTransport(), local.getFoundation());
+                RemoteCandidate remote = new RemoteCandidate(
+                        CandidateType.PEER_REFLEXIVE,
+                        remoteSocket.getAddress(),
+                        remoteSocket.getPort(),
+                        local.getComponentId(),
+                        local.getTransport(),
+                        local.getFoundation());
                 pair = new CandidatePair(local, remote, isLocalControlled());
                 pair.setState(PairState.SUCCEEDED);
 
 
                 if (!nominated.containsKey(pair.getLocalCandidate().getIceSocket())) {
-                    nominated.put(pair.getLocalCandidate().getIceSocket(), new ArrayList<CandidatePair>(pair.getLocalCandidate().getIceSocket().getComponents()));
+                    nominated.put(pair.getLocalCandidate().getIceSocket(),
+                            new ArrayList<CandidatePair>(pair.getLocalCandidate().getIceSocket().getComponents()));
 
 
                     for (int i = 0; i
@@ -2402,7 +2474,8 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
     void addReflexiveCandidate(IceDatagramSocket socket, CandidatePair pair) {
         // TODO: Handle the new reflexive candidate
-        log.log(Level.FINE, "New Reflexive Candidate: {0} <-> {1}", new Object[]{pair.getLocalCandidate().getSocketAddress(), pair.getRemoteCandidate().getSocketAddress()});
+        log.log(Level.FINE, "New Reflexive Candidate: {0} <-> {1}",
+                new Object[]{pair.getLocalCandidate().getSocketAddress(), pair.getRemoteCandidate().getSocketAddress()});
 
 
     }
