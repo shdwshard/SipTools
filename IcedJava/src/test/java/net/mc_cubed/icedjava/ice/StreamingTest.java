@@ -9,32 +9,20 @@ import java.util.Date;
 import javax.sdp.Media;
 import javax.sdp.SdpException;
 import javax.sdp.SdpFactory;
-import junit.framework.Assert;
-import junit.framework.TestCase;
+import org.junit.Assert;
+import org.junit.Test;
 
 /**
  *
  * @author shadow
  */
-public class StreamingTest extends TestCase {
+public class StreamingTest  {
 
-    public StreamingTest(String testName) {
-        super(testName);
+    public StreamingTest() {
     }
 
-    @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-    }
 
-    @Override
-    protected void tearDown() throws Exception {
-        super.tearDown();
-    }
-
-    // TODO add test methods here. The name must begin with 'test'. For example:
-    // public void testHello() {}
-    // This test is a placeholder for now, but will do something eventually.
+    @Test
     public void testRTPManagerStreaming() throws InterruptedException, IOException, SdpException {
         Media[] medias = new Media[2];
         SdpFactory factory = SdpFactory.getInstance();
@@ -66,7 +54,8 @@ public class StreamingTest extends TestCase {
             Thread.sleep(100);
         }
 
-        
+
+        // TODO: Create a stream from a file and test reception of the file
         
     }
 }

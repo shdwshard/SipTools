@@ -93,9 +93,9 @@
             <type>jar</type>
         </dependency>
         <dependency>
-            <groupId>${project.groupId}</groupId>
+            <groupId>net.mc_cubed</groupId>
             <artifactId>icedjava</artifactId>
-            <version>${project.version}</version>
+            <version>1.0-beta3</version>
         </dependency>
         <dependency>
             <groupId>org.jboss.weld</groupId>

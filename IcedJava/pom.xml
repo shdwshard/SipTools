@@ -9,7 +9,7 @@
     <groupId>net.mc_cubed</groupId>
     <artifactId>icedjava</artifactId>
     <name>IcedJava</name>
-    <version>1.0-beta2</version>
+    <version>1.0-beta3</version>
     <licenses>
         <license>
             <name>LGPL 3.0</name>

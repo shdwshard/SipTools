@@ -118,6 +118,17 @@ public class IcePMPBridge implements AddressDiscovery {
             for (LocalCandidate lc : lcs) {
                 // Only try NAT-PMP for Host Local IPv4 candidates
                 if (lc.getType() == CandidateType.LOCAL && lc.getAddress() instanceof Inet4Address) {
+                    /** 
+                     * Check whether the router and local address are on the same
+                     * network.  If not, there's little point in attempting this
+                     * mapping, as it's highly unlikely to work.
+                     * 
+                     * Currently, there doesn't seem to be a good way to do this
+                     * TODO: Find a good way to check whether the gateway and 
+                     * IP are on the same network/network interface
+                     */
+                    //NetworkInterface iface = NetworkInterface.getByInetAddress(lc.getAddress());
+                    
                     try {
                         // Now, we can set up a port mapping. Refer to the javadoc for
                         // the parameter values. This message sets up a TCP redirect from

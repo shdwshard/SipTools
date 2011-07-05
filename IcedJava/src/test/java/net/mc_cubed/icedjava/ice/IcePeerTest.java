@@ -36,32 +36,19 @@ import javax.sdp.SdpFactory;
 import javax.sdp.SdpParseException;
 import javax.sdp.SessionDescription;
 import javax.swing.SwingUtilities;
-import junit.framework.TestCase;
 import org.junit.Assert;
+import org.junit.Test;
 
 /**
  *
  * @author Charles Chappell
  */
-public class IcePeerTest extends TestCase {
-
-    public IcePeerTest(String testName) throws UnknownHostException {
-        super(testName);
-    }
-
-    @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-    }
-
-    @Override
-    protected void tearDown() throws Exception {
-        super.tearDown();
-    }
+public class IcePeerTest {
 
     /**
      * Test of collectCandidates method, of class IceStateMachine.
      */
+    @Test
     public void testCollectCandidates() throws SocketException, SdpException {
         System.out.println("collectCandidates");
         SdpFactory factory = SdpFactory.getInstance();
@@ -88,6 +75,7 @@ public class IcePeerTest extends TestCase {
         }
     }
 
+    @Test
     public void testMarkupCandidates() throws SdpException, SdpParseException, UnknownHostException, SocketException {
         System.out.println("collectCandidates");
         SdpFactory factory = SdpFactory.getInstance();
@@ -102,6 +90,7 @@ public class IcePeerTest extends TestCase {
 
     }
 
+    @Test
     public void testICESocket() throws SocketException, SdpException, InterruptedException, IOException, InvocationTargetException {
         final IceNegociationProgressForm form;
         if (!GraphicsEnvironment.isHeadless()) {
@@ -244,6 +233,7 @@ public class IcePeerTest extends TestCase {
 
     }
 
+    @Test
     public void testAggressiveICESocket() throws SocketException, SdpException, InterruptedException, IOException, InvocationTargetException {
         final IceNegociationProgressForm form;
         if (!GraphicsEnvironment.isHeadless()) {
@@ -387,6 +377,7 @@ public class IcePeerTest extends TestCase {
 
     }
 
+    @Test
     public void testICESocketConflict() throws SocketException, SdpException, InterruptedException, IOException, InvocationTargetException {
         final IceNegociationProgressForm form;
         if (!GraphicsEnvironment.isHeadless()) {
@@ -456,8 +447,8 @@ public class IcePeerTest extends TestCase {
             Assert.assertEquals(IceStatus.IN_PROGRESS, remotePeer.getStatus());
 
             long startTime = new Date().getTime();
-            // Wait for the state machines to die, or 30 seconds to pass
-            while (new Date().getTime() - startTime < 30000 && (localPeer.getStatus() == IceStatus.IN_PROGRESS || remotePeer.getStatus() == IceStatus.IN_PROGRESS)) {
+            // Wait for the state machines to die, or 60 seconds to pass
+            while (new Date().getTime() - startTime < 60000 && (localPeer.getStatus() == IceStatus.IN_PROGRESS || remotePeer.getStatus() == IceStatus.IN_PROGRESS)) {
                 Thread.sleep(500);
 
                 if (form != null) {
@@ -529,6 +520,7 @@ public class IcePeerTest extends TestCase {
         }
     }
 
+    @Test
     public void testAggressiveICESocketConflict() throws SocketException, SdpException, InterruptedException, IOException, InvocationTargetException {
         final IceNegociationProgressForm form;
 

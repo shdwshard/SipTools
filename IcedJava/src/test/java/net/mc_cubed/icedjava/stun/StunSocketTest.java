@@ -22,30 +22,17 @@ package net.mc_cubed.icedjava.stun;
 import net.mc_cubed.icedjava.packet.header.MessageClass;
 import net.mc_cubed.icedjava.packet.header.MessageMethod;
 import java.net.InetSocketAddress;
-import junit.framework.TestCase;
+import org.junit.Test;
 
 /**
  *
  * @author Charles Chappell
  */
-public class StunSocketTest extends TestCase {
+public class StunSocketTest {
 
     private static InetSocketAddress STUN_SERVER = StunUtil.getCachedStunServerSocket();
 
-    public StunSocketTest(String testName) {
-        super(testName);
-    }
-
-    @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-    }
-
-    @Override
-    protected void tearDown() throws Exception {
-        super.tearDown();
-    }
-
+    @Test
     public void testSocket() throws Exception, Throwable {
         System.out.println("socket");
         StunSocket instance1 = StunUtil.getStunSocket(1234, StunSocketType.BOTH);

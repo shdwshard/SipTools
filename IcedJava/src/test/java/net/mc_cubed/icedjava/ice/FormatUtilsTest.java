@@ -10,22 +10,19 @@ package net.mc_cubed.icedjava.ice;
 import javax.media.Format;
 import javax.media.format.AudioFormat;
 import javax.media.format.VideoFormat;
-import junit.framework.Assert;
-import junit.framework.TestCase;
+import org.junit.Assert;
+import org.junit.Test;
 
 /**
  *
  * @author shadow
  */
-public class FormatUtilsTest extends TestCase{
-
-    public FormatUtilsTest(String name) {
-        super(name);
-    }
+public class FormatUtilsTest {
 
     /**
      * Test of getAVPType method, of class FormatUtils.
      */
+    @Test
     public void testGetAVPType() {
         System.out.println("getAVPType");
         Format[] formats = new Format[] {
@@ -51,12 +48,14 @@ public class FormatUtilsTest extends TestCase{
     /**
      * Test of getAVPTypes method, of class FormatUtils.
      */
+    @Test
     public void testGetAVPTypes() {
         System.out.println("getAVPTypes");
         Format[] result = FormatUtils.getAVPTypes();
         Assert.assertEquals(35, result.length);
     }
 
+    @Test
     public void testKnownTypes() {
         System.out.println("testKnownTypes");
         Format[] formats = FormatUtils.getAVPTypes();

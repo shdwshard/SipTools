@@ -116,8 +116,8 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     private long lastSent = 0;
     private boolean sdpTimeout = true;
     private long refreshDelay = 15000; // 15 seconds
-    //private long sdpTimeoutTime = 15000;
-    //private long lastTouch = 0;
+    private long resetTimeout = 15000;
+    private long lastTouch = 0;
     private NominationType nomination = NominationType.REGULAR;
     private boolean restartFlag = false;
     protected IceStatus iceStatus = IceStatus.NOT_STARTED;
@@ -316,20 +316,24 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         }
     }
 
-    public void sendSessionUpdate() throws SdpException {
-        lastSent = new Date().getTime();
+    public void sendSessionUpdate() {
+        try {
+            lastSent = new Date().getTime();
 
-        List<Attribute> iceAttributes = getGlobalAttributes();
-        List<MediaDescription> iceMedias = getMediaDescriptions();
-        Connection conn = getDefaultConnection();
-        Origin origin = sdpFactory.createOrigin("-", hashCode(),
-                new Date().getTime(), conn.getNetworkType(),
-                conn.getAddressType(), conn.getAddress());
+            List<Attribute> iceAttributes = getGlobalAttributes();
+            List<MediaDescription> iceMedias = getMediaDescriptions();
+            Connection conn = getDefaultConnection();
+            Origin origin = sdpFactory.createOrigin("-", hashCode(),
+                    new Date().getTime(), conn.getNetworkType(),
+                    conn.getAddressType(), conn.getAddress());
 
-        setSdpTimeout(false);
+            setSdpTimeout(false);
 
-        if (sdpListener != null) {
-            sdpListener.updateMedia(origin, conn, iceAttributes, iceMedias);
+            if (sdpListener != null) {
+                sdpListener.updateMedia(origin, conn, iceAttributes, iceMedias);
+            }
+        } catch (SdpException ex) {
+            Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, "Caught exception sending an SDP update", ex);
         }
     }
 
@@ -362,13 +366,9 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                 // If we're controlling, send the SDP offer if timeout has occured,
                 // or it hasn't been sent yet.
                 if (localRole == AgentRole.CONTROLLING) {
-                    try {
-                        // This prevents packet storms
-                        if (isSdpTimeout()) {
-                            sendSessionUpdate();
-                        }
-                    } catch (SdpException ex) {
-                        log.log(Level.SEVERE, null, ex);
+                    // This prevents packet storms
+                    if (isSdpTimeout()) {
+                        sendSessionUpdate();
                     }
                 }
 
@@ -489,17 +489,15 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                                     }
                                 }
                             }
-                            iceStatus = IceStatus.SUCCESS;
+                            //iceStatus = IceStatus.SUCCESS;
                             checkStatus();
 
                             if (iceStatus == IceStatus.SUCCESS) {
-                                try {
-                                    sendSessionUpdate();
-                                } catch (SdpException ex) {
-                                    log.log(Level.SEVERE, null, ex);
-                                }
+                                sendSessionUpdate();
                             } else {
-                                if (isLocalControlled()) {
+                                // If it's been more than resetTimeout ms since the last STUN test was
+                                //  sent or received, and we're the controlling peer, do a reset.
+                                if (isLocalControlled() && new Date().getTime() - lastTouch > resetTimeout) {
                                     doReset(isLocalControlled(), true);
                                     return;
                                 }
@@ -817,7 +815,8 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     @Override
     public synchronized void start() {
         if (task == null || task.isDone() == true) {
-            iceStatus = IceStatus.IN_PROGRESS;
+            setIceStatus(IceStatus.IN_PROGRESS);
+
             // Do first run now
             run();
             task = getThreadpool().scheduleAtFixedRate(this, iceInterval, iceInterval, TimeUnit.MILLISECONDS);
@@ -1011,6 +1010,9 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             }
 
         }
+        
+        // Note the time we received this packet 
+        lastTouch = new Date().getTime();
 
         // Check whether this is a nomination request, and we're the controlled peer
         if (attrMap.containsKey(AttributeType.USE_CANDIDATE) && !isLocalControlled()) {
@@ -1159,9 +1161,14 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
 
                 // TODO: Collect Server Relayed Candidates if supported by server
+
+
             }
         }
-        return prioritize(retval);
+        /**
+         * Prioritize, then remove duplicate candidates of lower priority.
+         */
+        return removeDuplicates(prioritize(retval));
     }
 
     private void remoteTouch(final InetSocketAddress localSocket, final InetSocketAddress remoteSocket) {
@@ -1208,67 +1215,38 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      * Check the current status of Ice Processing and adjust it as appropriate
      */
     private void checkStatus() {
+
         /**
-         * In_progress is special case because we'll need to terminate ICE
-         * processing at some point.
+         * Keep checking for a success condition if we're either in-progress,
+         * or have failed
          */
-        if (iceStatus == IceStatus.IN_PROGRESS) {
-            IceStatus status = IceStatus.SUCCESS;
+        if (iceStatus == IceStatus.IN_PROGRESS || iceStatus == IceStatus.FAILED) {
+            // Fast abort: If we have no checkpairs, we cannot yet succeed or fail.
             if (checkPairs != null && !checkPairs.isEmpty()) {
+                // Being eternally optimistic, we assume success first
+                boolean didSucceed = true;
                 for (IceSocket socket : checkPairs.keySet()) {
-                    if (nominated.containsKey(socket)) {
-                        List<CandidatePair> cp = nominated.get(socket);
-                        if (socket.getComponents() != cp.size()) {
-                            status = IceStatus.FAILED;
-                        }
+                    if (nominated.containsKey(socket)
+                            && nominated.get(socket) != null
+                            && !nominated.get(socket).contains(null)) {
+                        // Replace the contents of the Using sockets with the
+                        // nominated pairs.  This usage method supports hot
+                        // re-negociation.
+                        using.putAll(nominated);
+                        // TODO: Shut down unused sockets, preserving only the used
+                        // socket pairs
                     } else {
-                        status = IceStatus.FAILED;
+                        didSucceed = false;
                     }
                 }
-                if (status == IceStatus.SUCCESS) {
+
+                if (didSucceed) {
                     // Update ICE status
-                    iceStatus = status;
-                    // Replace the contents of the Using sockets with the newly
-                    // nominated pairs.  This usage method supports hot
-                    // re-negociation
-                    using.putAll(nominated);
+                    setIceStatus(IceStatus.SUCCESS);
 
-                    // TODO: Shut down unused sockets, preserving only the used
-                    // socket pairs
                 }
             }
         }
-
-        /*
-         * If we're successful, check that we really did succeed.
-         * If we failed, check to make sure that a subsequent nomination didn't
-         * cause us to succeed.
-         */
-        if (iceStatus == IceStatus.FAILED || iceStatus == IceStatus.SUCCESS) {
-            IceStatus status = IceStatus.SUCCESS;
-            if (checkPairs != null) {
-                for (IceSocket socket : checkPairs.keySet()) {
-                    if (nominated.containsKey(socket)) {
-                        List<CandidatePair> cp = nominated.get(socket);
-                        if (socket.getComponents() != cp.size()) {
-                            status = IceStatus.FAILED;
-                        }
-                    } else {
-                        status = IceStatus.FAILED;
-                    }
-                }
-            } else {
-                status = IceStatus.FAILED;
-            }
-
-            if (status == IceStatus.SUCCESS) {
-                using.putAll(nominated);
-            }
-            iceStatus = status;
-
-
-        }
-
     }
 
     @Override
@@ -1429,17 +1407,6 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             }
         }
 
-
-
-        if (localRole == AgentRole.CONTROLLED) {
-            try {
-                // Send a reply to the controller
-                sendSessionUpdate();
-            } catch (SdpException ex) {
-                log.log(Level.SEVERE, null, ex);
-            }
-        }
-
     }
 
     public int getIceInterval() {
@@ -1592,13 +1559,9 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             iceStatus = IceStatus.IN_PROGRESS;
 
             if (!localControl) {
-                try {
-                    // Need to emit an SDP reply, as we thought we were the
-                    // controller before, and so never replied
-                    sendSessionUpdate();
-                } catch (SdpException ex) {
-                    Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, null, ex);
-                }
+                // Need to emit an SDP reply, as we thought we were the
+                // controller before, and so never replied
+                sendSessionUpdate();
             }
         }
     }
@@ -1706,6 +1669,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             String remotePassword, boolean controlling, int peerReflexPriority,
             long tieBreaker, boolean nominate) {
         try {
+            lastTouch = new Date().getTime();
             StunPacket stunPacket = StunUtil.createStunRequest(MessageClass.REQUEST, MessageMethod.BINDING);
             // ICE Specific Attributes
             stunPacket.getAttributes().add(AttributeFactory.createPriorityAttribute(peerReflexPriority));
@@ -1736,6 +1700,11 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             return new IceReplyFuture(ex);
         }
 
+    }
+
+    private void setIceStatus(IceStatus iceStatus) {
+        this.iceStatus = iceStatus;
+        sendSessionUpdate();
     }
 
     class IceReplyFuture implements Future<IceReply> {
@@ -2154,6 +2123,62 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     }
 
     /**
+     * Removes Makes a new list which has no duplicate candidates in it.  Does not
+     * change the original list.
+     * 
+     * @param candidates Candidates to remove duplicates from.  Input candidates
+     * must be prioritized for best results.
+     * @return 
+     */
+    private List<LocalCandidate> removeDuplicates(List<LocalCandidate> candidates) {
+        List<LocalCandidate> retval = new LinkedList<LocalCandidate>();
+
+        // Loop through all input candidates, adding them one at a time
+        for (LocalCandidate inputCandidate : candidates) {
+            boolean addCandidate = true;
+            LocalCandidate replaceCandidate = null;
+
+            /**
+             * Loop through existing candidates, searching for a matching public
+             *  address
+             */
+            for (LocalCandidate checkCandidate : retval) {
+                /**
+                 * If we find an address match, determine which is the higher priority candidate
+                 */
+                if (checkCandidate.getAddress().equals(inputCandidate.getAddress())
+                        && checkCandidate.getPort() == inputCandidate.getPort()) {
+                    /**
+                     * If the candidate we're checking has a higher or equal priority,
+                     * don't add the new candidate.
+                     * 
+                     * Otherwise, replace the "checkCandidate" with this new candidate.
+                     */
+                    if (checkCandidate.getPriority() >= inputCandidate.getPriority()) {
+                        addCandidate = false;
+                        break;
+                    } else {
+                        replaceCandidate = checkCandidate;
+                        break;
+                    }
+                }
+            }
+
+            /**
+             * Adding and replacing is done after the check loop to avoid 
+             *  concurrent modification issues
+             */
+            if (addCandidate) {
+                retval.add(inputCandidate);
+                if (replaceCandidate != null) {
+                    retval.remove(replaceCandidate);
+                }
+            }
+        }
+        return retval;
+    }
+
+    /**
      * Match and update CandidatePairs that already exist with a newly formed list.
      * Called as part of the Media update process.
      *
@@ -2197,7 +2222,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      * @param buf data to send
      */
     void sendTo(IceSocket socket, short channel, ByteBuffer buf) throws IOException {
-        if (nominated.containsKey(socket) && nominated.get(socket).size() > channel) {
+        if (nominated.containsKey(socket) && nominated.get(socket).size() > channel && nominated.get(socket).get(channel) != null) {
             CandidatePair pair = nominated.get(socket).get(channel);
             pair.getLocalCandidate().socket.send(buf, pair.remoteCandidate.getSocketAddress());
         }
@@ -2411,11 +2436,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         setLocalControlled(localControl);
 
         if (isLocalControlled()) {
-            try {
-                sendSessionUpdate();
-            } catch (SdpException ex) {
-                log.log(Level.SEVERE, "Exception generating session for peer during restart.", ex);
-            }
+            sendSessionUpdate();
         }
 
     }
