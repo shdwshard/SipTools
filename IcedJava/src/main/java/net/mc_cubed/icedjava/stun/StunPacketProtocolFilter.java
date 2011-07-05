@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.mc_cubed.icedjava.packet.StunPacket;
+import net.mc_cubed.icedjava.packet.header.MessageHeader;
 import org.glassfish.grizzly.filterchain.BaseFilter;
 import org.glassfish.grizzly.filterchain.FilterChainContext;
 import org.glassfish.grizzly.filterchain.NextAction;
@@ -45,8 +46,10 @@ public class StunPacketProtocolFilter extends BaseFilter {
         ByteBuffer buffer = ctx.getMessage();
         StunPacket packet = null;
         try {
-            packet = new StunPacketImpl(buffer.array(),buffer.arrayOffset(),buffer.remaining());
-            buffer.position(buffer.limit());
+            if (MessageHeader.isRFC5389StunPacket(buffer.array(), buffer.arrayOffset(), buffer.remaining())) {
+                packet = new StunPacketImpl(buffer.array(), buffer.arrayOffset(), buffer.remaining());
+                buffer.position(buffer.limit());
+            }
         } catch (Exception ex) {
             // If the factory throws an exception, this probably wasn't a stun packet
             //log.log(Level.INFO,"Caught an exception processing packet buffer",ex);
@@ -54,7 +57,7 @@ public class StunPacketProtocolFilter extends BaseFilter {
 
         if (packet != null) {
             log.log(Level.FINEST, "Decoded stun packet {0}", packet);
-            ctx.setMessage(packet);            
+            ctx.setMessage(packet);
         }
         return ctx.getInvokeAction();
     }
@@ -64,29 +67,27 @@ public class StunPacketProtocolFilter extends BaseFilter {
         Object msg = ctx.getMessage();
         InetSocketAddress dst = (InetSocketAddress) ctx.getAddress();
         if (msg instanceof StunPacket) {
-            log.log(Level.FINEST,"Encoding stun packet {0}",msg);
-            StunPacket stunPacket = (StunPacket)msg;
+            log.log(Level.FINEST, "Encoding stun packet {0}", msg);
+            StunPacket stunPacket = (StunPacket) msg;
             byte[] packetBytes = stunPacket.getBytes();
 
             // Check the packet size to make sure we're not as likely to fail
             if (dst.getAddress() instanceof Inet4Address) {
                 if (packetBytes.length > DatagramStunSocket.IP4_MAX_LENGTH) {
-                    throw new OversizeStunPacketException(dst,stunPacket);
+                    throw new OversizeStunPacketException(dst, stunPacket);
                 }
             } else {
-               if (packetBytes.length > DatagramStunSocket.IP6_MAX_LENGTH) {
-                    throw new OversizeStunPacketException(dst,stunPacket);                   
-               }
+                if (packetBytes.length > DatagramStunSocket.IP6_MAX_LENGTH) {
+                    throw new OversizeStunPacketException(dst, stunPacket);
+                }
             }
-            
+
             // Send the packet downstream as a byte buffer
             ctx.setMessage(ByteBuffer.wrap(packetBytes));
         }
         return ctx.getInvokeAction();
     }
 
-    
     public StunPacketProtocolFilter() {
     }
-
 }
