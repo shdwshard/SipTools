@@ -25,7 +25,6 @@ import com.hoodcomputing.natpmp.NatPmpDevice;
 import com.hoodcomputing.natpmp.NatPmpException;
 import java.io.IOException;
 import java.net.Inet4Address;
-import java.net.NetworkInterface;
 import java.util.Collection;
 import java.util.LinkedList;
 import net.mc_cubed.icedjava.ice.AddressDiscovery;

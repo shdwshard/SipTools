@@ -23,7 +23,6 @@ package net.mc_cubed.icedjava.ice;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import net.mc_cubed.icedjava.stun.DemultiplexerSocket;
-import net.mc_cubed.icedjava.stun.TCPSocketType;
 import net.mc_cubed.icedjava.stun.TransportType;
 
 /**

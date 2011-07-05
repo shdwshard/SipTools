@@ -116,8 +116,8 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     private long lastSent = 0;
     private boolean sdpTimeout = true;
     private long refreshDelay = 15000; // 15 seconds
-    //private long sdpTimeoutTime = 15000;
-    //private long lastTouch = 0;
+    private long resetTimeout = 15000;
+    private long lastTouch = 0;
     private NominationType nomination = NominationType.REGULAR;
     private boolean restartFlag = false;
     protected IceStatus iceStatus = IceStatus.NOT_STARTED;
@@ -495,7 +495,9 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                             if (iceStatus == IceStatus.SUCCESS) {
                                 sendSessionUpdate();
                             } else {
-                                if (isLocalControlled()) {
+                                // If it's been more than resetTimeout ms since the last STUN test was
+                                //  sent or received, and we're the controlling peer, do a reset.
+                                if (isLocalControlled() && new Date().getTime() - lastTouch > resetTimeout) {
                                     doReset(isLocalControlled(), true);
                                     return;
                                 }
@@ -1031,6 +1033,9 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             }
 
         }
+        
+        // Note the time we received this packet 
+        lastTouch = new Date().getTime();
 
         // Check whether this is a nomination request, and we're the controlled peer
         if (attrMap.containsKey(AttributeType.USE_CANDIDATE) && !isLocalControlled()) {
@@ -1689,6 +1694,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             String remotePassword, boolean controlling, int peerReflexPriority,
             long tieBreaker, boolean nominate) {
         try {
+            lastTouch = new Date().getTime();
             StunPacket stunPacket = StunUtil.createStunRequest(MessageClass.REQUEST, MessageMethod.BINDING);
             // ICE Specific Attributes
             stunPacket.getAttributes().add(AttributeFactory.createPriorityAttribute(peerReflexPriority));
@@ -1988,10 +1994,19 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
             List<InetSocketAddress> useAddrs = new LinkedList<InetSocketAddress>();
 
-            // Select the candidates to use
-            if (nominated.get(socket) != null
-                    && nominated.get(socket).size() == socket.getMedia().getPortCount()
-                    && !nominated.get(socket).contains(null)) {
+            // Check whether this socket has a complete set of candidates
+            boolean complete = false;
+            if (nominated.get(socket) != null && nominated.get(socket).size() >= 1) {
+                complete = true;
+                for (CandidatePair pair : nominated.get(socket)) {
+                    if (pair == null || pair.getLocalCandidate() == null) {
+                        complete = false;
+                    }
+                }
+            }
+
+            // Return the SDP based on whether the candidates are complete or not.
+            if (complete) {
                 for (CandidatePair pair : nominated.get(socket)) {
                     if (pair == null || pair.getLocalCandidate() == null) {
                         log.log(Level.SEVERE, "Got a null local candidate, THIS IS A BUG: {0}", pair);
