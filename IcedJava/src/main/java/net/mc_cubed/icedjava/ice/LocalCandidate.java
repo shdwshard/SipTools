@@ -22,6 +22,7 @@ package net.mc_cubed.icedjava.ice;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.util.Date;
 import net.mc_cubed.icedjava.stun.DemultiplexerSocket;
 import net.mc_cubed.icedjava.stun.TransportType;
 
@@ -45,7 +46,67 @@ public class LocalCandidate extends Candidate {
     DemultiplexerSocket socket;
     private final IcePeer owner;
     private final IceSocket iceSocket;
-//
+
+    protected Date nextKeepalive;
+
+    /**
+     * Get the value of nextKeepalive
+     *
+     * @return the value of nextKeepalive
+     */
+    public Date getNextKeepalive() {
+        return nextKeepalive;
+    }
+
+    /**
+     * Set the value of nextKeepalive
+     *
+     * @param nextKeepalive new value of nextKeepalive
+     */
+    public void setNextKeepalive(Date nextKeepalive) {
+        this.nextKeepalive = nextKeepalive;
+    }
+
+    protected KeepaliveHandler keepaliveHandler;
+
+    /**
+     * Get the value of keepaliveHandler
+     *
+     * @return the value of keepaliveHandler
+     */
+    public KeepaliveHandler getKeepaliveHandler() {
+        return keepaliveHandler;
+    }
+
+    /**
+     * Set the value of keepaliveHandler
+     *
+     * @param keepaliveHandler new value of keepaliveHandler
+     */
+    public void setKeepaliveHandler(KeepaliveHandler keepaliveHandler) {
+        this.keepaliveHandler = keepaliveHandler;
+    }
+
+    protected Object keepaliveObjectData;
+
+    /**
+     * Get the value of keepaliveObjectData
+     *
+     * @return the value of keepaliveObjectData
+     */
+    public Object getKeepaliveObjectData() {
+        return keepaliveObjectData;
+    }
+
+    /**
+     * Set the value of keepaliveObjectData
+     *
+     * @param keepaliveObjectData new value of keepaliveObjectData
+     */
+    public void setKeepaliveObjectData(Object keepaliveObjectData) {
+        this.keepaliveObjectData = keepaliveObjectData;
+    }
+
     @Override
     public final String getFoundation() {
         // The foundation computation is defined in 4.1.1.3

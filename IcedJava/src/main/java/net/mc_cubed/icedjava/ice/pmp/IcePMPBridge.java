@@ -26,10 +26,14 @@ import com.hoodcomputing.natpmp.NatPmpException;
 import java.io.IOException;
 import java.net.Inet4Address;
 import java.util.Collection;
+import java.util.Date;
 import java.util.LinkedList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import net.mc_cubed.icedjava.ice.AddressDiscovery;
 import net.mc_cubed.icedjava.ice.Candidate.CandidateType;
 import net.mc_cubed.icedjava.ice.DiscoveryMechanism;
+import net.mc_cubed.icedjava.ice.KeepaliveHandler;
 import net.mc_cubed.icedjava.ice.LocalCandidate;
 import net.mc_cubed.icedjava.stun.TransportType;
 
@@ -46,8 +50,9 @@ import net.mc_cubed.icedjava.stun.TransportType;
  */
 @DiscoveryMechanism
 @SuppressWarnings("StaticNonFinalUsedInInitialization")
-public class IcePMPBridge implements AddressDiscovery {
+public class IcePMPBridge implements AddressDiscovery, KeepaliveHandler {
 
+    public final int KEEPALIVE_INTERVAL = 3600;
     static volatile NatPmpDevice pmpDevice;
     static Inet4Address extIP = null;
 
@@ -128,7 +133,6 @@ public class IcePMPBridge implements AddressDiscovery {
                      * IP are on the same network/network interface
                      */
                     //NetworkInterface iface = NetworkInterface.getByInetAddress(lc.getAddress());
-                    
                     try {
                         // Now, we can set up a port mapping. Refer to the javadoc for
                         // the parameter values. This message sets up a TCP redirect from
@@ -137,9 +141,11 @@ public class IcePMPBridge implements AddressDiscovery {
                         // want to consider having a longer lifetime and periodicly sending
                         // a MapRequestMessage to prevent it from expiring.
 
-                        MapRequestMessage map = new MapRequestMessage((lc.getTransport() == TransportType.TCP), lc.getPort(), 0, 300, null);
+                        MapRequestMessage map = new MapRequestMessage((lc.getTransport() == TransportType.TCP), lc.getPort(), 0, KEEPALIVE_INTERVAL, null);
                         pmpDevice.enqueueMessage(map);
                         pmpDevice.waitUntilQueueEmpty();
+
+                        Long mapLifetime = map.getPortMappingLifetime();
 
                         // Let's find out what the external port is.
                         int extPort = map.getExternalPort();
@@ -150,7 +156,16 @@ public class IcePMPBridge implements AddressDiscovery {
                         // contact a developer on the SourceForge project or post in the
                         // forums if you have questions.
 
-                        retval.add(new LocalCandidate(lc.getOwner(), lc.getIceSocket(), CandidateType.NAT_ASSISTED, extIP, extPort, lc));
+                        LocalCandidate newLc = new LocalCandidate(lc.getOwner(), lc.getIceSocket(), CandidateType.NAT_ASSISTED, extIP, extPort, lc);
+
+
+                        // Set the next keepalive time
+                        newLc.setNextKeepalive(nextKeepaliveTime(mapLifetime));
+
+                        // Make sure this bridge is called for keepalives
+                        newLc.setKeepaliveHandler(this);
+
+                        retval.add(newLc);
                     } catch (NatPmpException ex) {
                         /**
                          * In general, we're not too concerned about this exception.
@@ -162,5 +177,38 @@ public class IcePMPBridge implements AddressDiscovery {
             }
         }
         return retval;
+    }
+
+    @Override
+    public void doKeepalive(LocalCandidate lc) {
+        try {
+            MapRequestMessage map = new MapRequestMessage((lc.getTransport() == TransportType.TCP), lc.getPort(), 0, KEEPALIVE_INTERVAL, null);
+            pmpDevice.enqueueMessage(map);
+            pmpDevice.waitUntilQueueEmpty();
+            Long mapLifetime = map.getPortMappingLifetime();
+
+            lc.setNextKeepalive(nextKeepaliveTime(mapLifetime));
+        } catch (NatPmpException npe) {
+            Logger.getLogger(getClass().getName()).log(Level.WARNING,"Caught an exception refreshing a LC.  Setting it to retry in 10 seconds",npe);
+            lc.setNextKeepalive(nextKeepaliveTime(Long.valueOf(20)));
+        }
+    }
+
+    /**
+     * Calculate the next keep-alive time based on the given timeout interval
+     * 
+     * @param mapLifetime
+     * @return 
+     */
+    Date nextKeepaliveTime(Long mapLifetime) {
+        // Calculate the next keepalive time                        
+        Date nextKeepalive;
+        if (mapLifetime > 600) {
+            nextKeepalive = new Date(new Date().getTime() + mapLifetime * 900);
+        } else {
+            nextKeepalive = new Date(new Date().getTime() + mapLifetime * 500);
+        }
+
+        return nextKeepalive;
     }
 }

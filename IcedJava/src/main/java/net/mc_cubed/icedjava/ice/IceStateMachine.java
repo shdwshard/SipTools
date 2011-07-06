@@ -379,6 +379,21 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         }
     }
 
+    /**
+     * Checks local candidates to see if they are of a type that needs refreshing
+     *  and if so, if they are past their nextRefresh time.  If so, it calls
+     *  the refreshHandler.
+     */
+    void doRefreshes() {
+        Date now = new Date();
+        for (List<LocalCandidate> candidates : socketCandidateMap.values()) {
+            for (LocalCandidate candidate : candidates) {
+                if (candidate.getKeepaliveHandler() != null && (candidate.getNextKeepalive() == null || candidate.getNextKeepalive().before(now))) {
+                    candidate.getKeepaliveHandler().doKeepalive(candidate);
+                }
+            }
+        }
+    }
     /*
      * This method implements the ICE State machine.  It is called periodically
      */
@@ -388,6 +403,11 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         // Ice negociation phase
         try {
 
+            /**
+             * Refresh any port mappings in need of a refresh
+             */
+            doRefreshes();
+            
             if (iceStatus == IceStatus.IN_PROGRESS) {
                 // First check for any finished pairs
                 for (Entry<IceSocket, List<CandidatePair>> pairsEntry : checkPairs.entrySet()) {

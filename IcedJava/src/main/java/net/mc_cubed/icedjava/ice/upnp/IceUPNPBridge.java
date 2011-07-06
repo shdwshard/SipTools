@@ -24,12 +24,14 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Collection;
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.mc_cubed.icedjava.ice.AddressDiscovery;
 import net.mc_cubed.icedjava.ice.DiscoveryMechanism;
 import net.mc_cubed.icedjava.ice.Candidate.CandidateType;
+import net.mc_cubed.icedjava.ice.KeepaliveHandler;
 import net.mc_cubed.icedjava.ice.LocalCandidate;
 import net.sbbi.upnp.impls.InternetGatewayDevice;
 import net.sbbi.upnp.messages.UPNPResponseException;
@@ -46,10 +48,11 @@ import net.sbbi.upnp.messages.UPNPResponseException;
  */
 @DiscoveryMechanism
 @SuppressWarnings("StaticNonFinalUsedInInitialization")
-public class IceUPNPBridge implements AddressDiscovery {
+public class IceUPNPBridge implements AddressDiscovery, KeepaliveHandler {
 
     static final int discoveryTimeout = 5000; // 5 secs to receive a response from devices
     static InternetGatewayDevice[] devices;
+    public final int KEEPALIVE_INTERVAL = 3600;
 
     public IceUPNPBridge() {
     }
@@ -111,12 +114,20 @@ public class IceUPNPBridge implements AddressDiscovery {
                             /**
                              * Try to create a UPNP mapping for the given port
                              */
-                            if (device.addPortMapping("IceUPNPBridge Mapping port: " + socketAddress.getPort(), null, socketAddress.getPort(), socketAddress.getPort(), socketAddress.getAddress().getHostAddress(), 0, "UDP")) {
+                            if (device.addPortMapping("IceUPNPBridge Mapping port: " + socketAddress.getPort(), null, socketAddress.getPort(), socketAddress.getPort(), socketAddress.getAddress().getHostAddress(), KEEPALIVE_INTERVAL, "UDP")) {
                                 /**
                                  * If the mapping succeeds, add it to the return
                                  * list
                                  */
-                                retval.add(new LocalCandidate(lc.getOwner(), lc.getIceSocket(), CandidateType.NAT_ASSISTED, natAddress, socketAddress.getPort(), lc));
+                                LocalCandidate newLc = new LocalCandidate(lc.getOwner(), lc.getIceSocket(), CandidateType.NAT_ASSISTED, natAddress, socketAddress.getPort(), lc);
+
+                                newLc.setKeepaliveHandler(this);
+
+                                newLc.setNextKeepalive(nextKeepaliveTime(KEEPALIVE_INTERVAL));
+
+                                newLc.setKeepaliveObjectData(device);
+
+                                retval.add(newLc);
                             }
                         } catch (IOException ex) {
                             /**
@@ -129,6 +140,19 @@ public class IceUPNPBridge implements AddressDiscovery {
                              * In general, we're not TOO concerned about
                              * exceptions thrown by the UPNP library, but don't
                              * want to stop processing if one occurs.
+                             * 
+                             * Here's what the documentation says this means.
+                             * A more complete implementation to handle these
+                             *  conditions would be optimal
+                             * @throws UPNPResponseException if the device does not accept some settings :<br/>
+                             *                               402 Invalid Args See UPnP Device Architecture section on Control<br/>
+                             *                               501 Action Failed See UPnP Device Architecture section on Control<br/>
+                             *                               715 WildCardNotPermittedInSrcIP The source IP address cannot be wild-carded<br/>
+                             *                               716 WildCardNotPermittedInExtPort The external port cannot be wild-carded <br/>
+                             *                               724 SamePortValuesRequired Internal and External port values must be the same<br/>
+                             *                               725 OnlyPermanentLeasesSupported The NAT implementation only supports permanent lease times on port mappings<br/>
+                             *                               726 RemoteHostOnlySupportsWildcard RemoteHost must be a wildcard and cannot be a specific IP address or DNS name<br/>
+                             *                               727 ExternalPortOnlySupportsWildcard ExternalPort must be a wildcard and cannot be a specific port value
                              */
                         }
                     }
@@ -149,5 +173,66 @@ public class IceUPNPBridge implements AddressDiscovery {
         }
 
         return retval;
+    }
+
+    @Override
+    public void doKeepalive(LocalCandidate lc) {
+        InternetGatewayDevice device = (InternetGatewayDevice) lc.getKeepaliveObjectData();
+        InetSocketAddress socketAddress = lc.getSocketAddress();
+        try {
+            /**
+             * Try to create a UPNP mapping for the given port
+             */
+            if (device.addPortMapping("IceUPNPBridge Mapping port: " + socketAddress.getPort(), null, socketAddress.getPort(), socketAddress.getPort(), socketAddress.getAddress().getHostAddress(), KEEPALIVE_INTERVAL, "UDP")) {
+                lc.setNextKeepalive(nextKeepaliveTime(KEEPALIVE_INTERVAL));
+            } else {
+                lc.setNextKeepalive(nextKeepaliveTime(20));
+            }
+        } catch (IOException ex) {
+            /**
+             * In general, we're not TOO concerned about
+             * exceptions thrown by the UPNP library, but don't
+             * want to stop processing if one occurs.
+             */
+            lc.setNextKeepalive(nextKeepaliveTime(20));
+        } catch (UPNPResponseException ex) {
+            /**
+             * In general, we're not TOO concerned about
+             * exceptions thrown by the UPNP library, but don't
+             * want to stop processing if one occurs.
+             *
+             * Here's what the documentation says this means.
+             * A more complete implementation to handle these
+             *  conditions would be optimal
+             * @throws UPNPResponseException if the device does not accept some settings :<br/>
+             *                               402 Invalid Args See UPnP Device Architecture section on Control<br/>
+             *                               501 Action Failed See UPnP Device Architecture section on Control<br/>
+             *                               715 WildCardNotPermittedInSrcIP The source IP address cannot be wild-carded<br/>
+             *                               716 WildCardNotPermittedInExtPort The external port cannot be wild-carded <br/>
+             *                               724 SamePortValuesRequired Internal and External port values must be the same<br/>
+             *                               725 OnlyPermanentLeasesSupported The NAT implementation only supports permanent lease times on port mappings<br/>
+             *                               726 RemoteHostOnlySupportsWildcard RemoteHost must be a wildcard and cannot be a specific IP address or DNS name<br/>
+             *                               727 ExternalPortOnlySupportsWildcard ExternalPort must be a wildcard and cannot be a specific port value
+             */
+            lc.setNextKeepalive(nextKeepaliveTime(20));
+        }
+    }
+
+    /**
+     * Calculate the next keep-alive time based on the given timeout interval
+     * 
+     * @param mapLifetime
+     * @return 
+     */
+    Date nextKeepaliveTime(int mapLifetime) {
+        // Calculate the next keepalive time                        
+        Date nextKeepalive;
+        if (mapLifetime > 600) {
+            nextKeepalive = new Date(new Date().getTime() + mapLifetime * 900);
+        } else {
+            nextKeepalive = new Date(new Date().getTime() + mapLifetime * 500);
+        }
+
+        return nextKeepalive;
     }
 }
