@@ -1416,12 +1416,16 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         /**
          * Fast abort: If we got a duplicate, or old session, end here.
          */
-        if (lastRemoteVersion >= origin.getSessionVersion()) {
-            return;
+        try {
+            if (lastRemoteVersion >= origin.getSessionVersion()) {
+                return;
+            }
+
+            lastRemoteVersion = origin.getSessionVersion();
+        } catch (NumberFormatException nfe) {
+            log.log(Level.WARNING,"Caught a number format exception reading the session version.\n"
+                    + "Disabling version checking, but this can cause loops.",nfe);
         }
-
-        lastRemoteVersion = origin.getSessionVersion();
-
         boolean uFragChanged = false, pwdChanged = false;
         String newRemoteUFrag = null, newRemotePassword = null;
         /**
