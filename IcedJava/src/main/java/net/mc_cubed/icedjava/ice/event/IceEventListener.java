@@ -31,4 +31,5 @@ import java.util.EventListener;
 public interface IceEventListener extends EventListener {
 
     void iceEvent(IceEvent event);
+
 }

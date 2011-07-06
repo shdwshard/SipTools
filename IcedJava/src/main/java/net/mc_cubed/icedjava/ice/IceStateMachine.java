@@ -20,6 +20,9 @@
 package net.mc_cubed.icedjava.ice;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -40,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
@@ -63,6 +67,14 @@ import javax.sdp.SdpFactory;
 import javax.sdp.SdpParseException;
 import javax.sdp.SessionDescription;
 import net.mc_cubed.icedjava.ice.Candidate.CandidateType;
+import net.mc_cubed.icedjava.ice.event.IceEvent;
+import net.mc_cubed.icedjava.ice.event.IceEventListener;
+import net.mc_cubed.icedjava.ice.event.IceFailedEvent;
+import net.mc_cubed.icedjava.ice.event.IceRestartEvent;
+import net.mc_cubed.icedjava.ice.event.IceSDPUpdateEvent;
+import net.mc_cubed.icedjava.ice.event.IceStartedEvent;
+import net.mc_cubed.icedjava.ice.event.IceStoppedEvent;
+import net.mc_cubed.icedjava.ice.event.IceSucceededEvent;
 import net.mc_cubed.icedjava.ice.pmp.IcePMPBridge;
 import net.mc_cubed.icedjava.ice.upnp.IceUPNPBridge;
 import net.mc_cubed.icedjava.packet.StunPacket;
@@ -151,6 +163,23 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     boolean localOnly = false;
     boolean sendKeepalives = false;
     private long lastRemoteVersion = 0;
+    private Set<IceEventListener> iceEventListeners = new java.util.concurrent.CopyOnWriteArraySet<IceEventListener>();
+
+    /**
+     * IceEventListeners will receive asynchronous notification of IceEvents on
+     * an IceSocketChannel.
+     * 
+     * @param listener 
+     */
+    @Override
+    public void addEventListener(IceEventListener listener) {
+        iceEventListeners.add(listener);
+    }
+
+    @Override
+    public void removeEventListener(IceEventListener listener) {
+        iceEventListeners.remove(listener);
+    }
 
     @Override
     @SuppressWarnings("FinalizeDeclaration")
@@ -302,8 +331,6 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         }
         return sdpFactory.createConnection(Connection.IN, addrType,
                 addr.getHostAddress());
-
-
     }
 
     private InetAddress getDefaultConnectionBasis() {
@@ -318,20 +345,34 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     }
 
     public void sendSessionUpdate() {
+        sendSessionUpdate(false);
+    }
+
+    public void sendSessionUpdate(boolean restart) {
         try {
-            lastSent = new Date().getTime();
+            Date lastModified = new Date();
+            lastSent = lastModified.getTime();
 
             List<Attribute> iceAttributes = getGlobalAttributes();
             List<MediaDescription> iceMedias = getMediaDescriptions();
             Connection conn = getDefaultConnection();
             Origin origin = sdpFactory.createOrigin("-", hashCode(),
-                    new Date().getTime(), conn.getNetworkType(),
+                    lastSent, conn.getNetworkType(),
                     conn.getAddressType(), conn.getAddress());
 
             setSdpTimeout(false);
 
             if (sdpListener != null) {
                 sdpListener.updateMedia(origin, conn, iceAttributes, iceMedias);
+            }
+
+            if (!iceEventListeners.isEmpty()) {
+                IceSDPUpdateEvent updateEvent = new IceSDPUpdateEventImpl(this, conn, iceAttributes, iceMedias, lastModified);
+                if (restart) {
+                    broadcastAs(IceRestartEvent.class, updateEvent);
+                } else {
+                    broadcast(updateEvent);
+                }
             }
         } catch (SdpException ex) {
             Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, "Caught exception sending an SDP update", ex);
@@ -864,9 +905,10 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         if (task == null || task.isDone() == true) {
             setIceStatus(IceStatus.IN_PROGRESS);
 
-            // Do first run now
-            run();
+            // Schedule the ice runner
             task = getThreadpool().scheduleAtFixedRate(this, iceInterval, iceInterval, TimeUnit.MILLISECONDS);
+            // Then do first run now
+            run();
         }
     }
 
@@ -1759,8 +1801,105 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     }
 
     private void setIceStatus(IceStatus iceStatus) {
-        this.iceStatus = iceStatus;
-        sendSessionUpdate();
+        if (this.iceStatus != iceStatus) {
+            IceStatus oldStatus = this.iceStatus;
+            this.iceStatus = iceStatus;
+
+            if (iceStatus != IceStatus.STOPPED) {
+                sendSessionUpdate();
+            }
+            // Don't bother if we don't have listeners
+            if (!iceEventListeners.isEmpty()) {
+                IceStatusChangeEventImpl event = new IceStatusChangeEventImpl(oldStatus, iceStatus, new Date(), this);
+                switch (iceStatus) {
+                    case IN_PROGRESS:
+                        broadcastAs(IceStartedEvent.class, event);
+                        break;
+                    case SUCCESS:
+                        broadcastAs(IceSucceededEvent.class, event);
+                        break;
+                    case FAILED:
+                        broadcastAs(IceFailedEvent.class, event);
+                        break;
+                    case STOPPED:
+                        broadcastAs(IceStoppedEvent.class, event);
+                        break;
+                    default:
+                        broadcast(event);
+                }
+            }
+        }
+    }
+
+    private void broadcastAs(Class<? extends IceEvent> aClass, IceEvent event) {
+        if (hasAllMethods(aClass, event)) {
+            IceEvent coercedEvent = (IceEvent) Proxy.newProxyInstance(event.getClass().getClassLoader(), new Class[]{aClass}, getHandler(event));
+            broadcast(coercedEvent);
+        } else {
+            throw new IllegalArgumentException("Object " + event + " MUST implement all the methods in the interface " + aClass);
+        }
+    }
+
+    private InvocationHandler getHandler(final IceEvent target) {
+        // Form the method map for the invocation handler
+        final Map<Integer, Method> methodMap = new HashMap<Integer, Method>();
+        for (Method method : target.getClass().getMethods()) {
+            int hashValue = method.hashCode();
+
+            for (Class paramClass : method.getParameterTypes()) {
+                hashValue = hashValue * 7 + paramClass.hashCode();
+            }
+
+            methodMap.put(hashValue, method);
+        }
+
+        return new InvocationHandler() {
+
+            @Override
+            public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+                int hashValue = method.hashCode();
+
+                for (Class paramClass : method.getParameterTypes()) {
+                    hashValue = hashValue * 7 + paramClass.hashCode();
+                }
+
+                if (methodMap.containsKey(hashValue)) {
+                    return methodMap.get(hashValue).invoke(target, args);
+                } else {
+                    throw new java.lang.NoSuchMethodException();
+                }
+            }
+        };
+    }
+
+    private boolean hasAllMethods(Class<?> anInterface, Object anObject) {
+        for (Method method : anInterface.getMethods()) {
+            Method checkMethod = null;
+            try {
+                checkMethod = anObject.getClass().getMethod(method.getName(), method.getParameterTypes());
+            } catch (NoSuchMethodException ex) {
+            } catch (SecurityException ex) {
+            }
+
+            if (checkMethod == null || checkMethod.getReturnType() != method.getReturnType()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void broadcast(IceEvent event) {
+        if (event != null) {
+            for (IceEventListener listener : iceEventListeners) {
+                try {
+                    listener.iceEvent(event);
+                } catch (Throwable t) {
+                    log.log(Level.WARNING, "A listener threw an exception.", t);
+                }
+            }
+        } else {
+            throw new IllegalArgumentException("Events CANNOT be null");
+        }
     }
 
     class IceReplyFuture implements Future<IceReply> {
@@ -2482,6 +2621,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
     @Override
     public void close() {
+        setIceStatus(IceStatus.STOPPED);
         // Stop any ongoing ICE processing
         stop();
         // Close down all connections
@@ -2535,7 +2675,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
         setLocalControlled(localControl);
 
-        sendSessionUpdate();
+        sendSessionUpdate(true);
 
     }
 

@@ -19,18 +19,13 @@
  */
 package net.mc_cubed.icedjava.ice.event;
 
-import java.util.Date;
-import net.mc_cubed.icedjava.ice.IceStatus;
-
 /**
+ * Signals that ICE processing has restarted, which is accompanied by an SDP
+ * update
  *
- * @author charles
+ * @author Charles Chappell
+ * @since 1.0
  */
-public interface IceStatusChangeEvent extends IceProgressEvent {
+public interface IceRestartEvent extends IceSDPUpdateEvent {
     
-    IceStatus getLastStatus();
-    
-    IceStatus getCurrentStatus();
-    
-    Date getUpdatedTimestamp();
 }

@@ -219,6 +219,11 @@ class DatagramStunSocket extends BaseFilter implements StunSocket {
     public void close() throws IOException {
         try {
             connection.get().close().get();
+            /**
+             * Needed to ensure socket re-use is possible.
+             * Thank you Johannes Buchner <johannes.buchner.acad@gmx.com>
+             */
+            StunUtil.getDatagramTransport().unbind(connection.get());
         } catch (InterruptedException ex) {
             Logger.getLogger(DatagramStunSocket.class.getName()).log(Level.SEVERE, null, ex);
         } catch (ExecutionException ex) {

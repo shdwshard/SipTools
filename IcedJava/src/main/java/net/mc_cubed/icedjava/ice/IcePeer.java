@@ -28,6 +28,7 @@ import javax.sdp.MediaDescription;
 import javax.sdp.SdpException;
 import javax.sdp.SdpParseException;
 import javax.sdp.SessionDescription;
+import net.mc_cubed.icedjava.ice.event.IceEventListener;
 import org.glassfish.grizzly.filterchain.Filter;
 
 /**
@@ -162,11 +163,21 @@ public interface IcePeer extends SDPListener, Filter {
      * @return true if the given remote address matches this peer
      */
     public boolean hasRemoteAddress(SocketAddress address, IceSocket socket, Short componentId);
-    
+
     /**
      * A convenience method which takes a textual SDP descriptor, then parses 
      * and delivers the results to the appropriate updateMedia() method.
      * @param sdpText 
-     */  
+     */
     public void updateMedia(String sdpText) throws SdpParseException;
+
+    /**
+     * IceEventListeners will receive asynchronous notification of IceEvents on
+     * an IceSocketChannel.
+     * 
+     * @param listener 
+     */
+    void addEventListener(IceEventListener listener);
+
+    void removeEventListener(IceEventListener listener);
 }

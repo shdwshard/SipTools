@@ -30,5 +30,6 @@ public enum IceStatus {
     NOT_STARTED,
     IN_PROGRESS,
     SUCCESS,
-    FAILED;
+    FAILED,
+    STOPPED;
 }

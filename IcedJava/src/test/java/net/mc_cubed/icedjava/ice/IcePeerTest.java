@@ -36,6 +36,8 @@ import javax.sdp.SdpFactory;
 import javax.sdp.SdpParseException;
 import javax.sdp.SessionDescription;
 import javax.swing.SwingUtilities;
+import net.mc_cubed.icedjava.ice.event.IceEvent;
+import net.mc_cubed.icedjava.ice.event.IceEventListener;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -125,6 +127,18 @@ public class IcePeerTest {
             // Create a "remote" peer
             remotePeer = IceFactory.createIcePeer("remotePeer", remoteSockets);
 
+            localPeer.addEventListener(new IceEventListener() {
+                @Override
+                public void iceEvent(IceEvent event) {
+                    Logger.getLogger(getClass().getName()).log(Level.INFO,"Got event: {0} ({1})",new Object[] {event,event.getClass()});
+                }
+            }); 
+            remotePeer.addEventListener(new IceEventListener() {
+                @Override
+                public void iceEvent(IceEvent event) {
+                    Logger.getLogger(getClass().getName()).log(Level.INFO,"Got event: {0} ({1})",new Object[] {event,event.getClass()});
+                }
+            }); 
             // Establish the SDP connection
             new LoggingSdpExchanger(remotePeer, localPeer);
             //localPeer.setSdpListener(remotePeer);
@@ -267,6 +281,19 @@ public class IcePeerTest {
 
             // Create a "remote" peer
             remotePeer = IceFactory.createIcePeer("remotePeer", remoteSockets);
+
+            localPeer.addEventListener(new IceEventListener() {
+                @Override
+                public void iceEvent(IceEvent event) {
+                    Logger.getLogger(getClass().getName()).log(Level.INFO,"Got event: {0} ({1})",new Object[] {event,event.getClass()});
+                }
+            }); 
+            remotePeer.addEventListener(new IceEventListener() {
+                @Override
+                public void iceEvent(IceEvent event) {
+                    Logger.getLogger(getClass().getName()).log(Level.INFO,"Got event: {0} ({1})",new Object[] {event,event.getClass()});
+                }
+            }); 
 
             // Establish the SDP connection
             new LoggingSdpExchanger(remotePeer, localPeer);
@@ -412,6 +439,18 @@ public class IcePeerTest {
             // Create a "remote" peer
             remotePeer = IceFactory.createIcePeer("remotePeer", remoteSockets);
 
+            localPeer.addEventListener(new IceEventListener() {
+                @Override
+                public void iceEvent(IceEvent event) {
+                    Logger.getLogger(getClass().getName()).log(Level.INFO,"Got event: {0} ({1})",new Object[] {event,event.getClass()});
+                }
+            }); 
+            remotePeer.addEventListener(new IceEventListener() {
+                @Override
+                public void iceEvent(IceEvent event) {
+                    Logger.getLogger(getClass().getName()).log(Level.INFO,"Got event: {0} ({1})",new Object[] {event,event.getClass()});
+                }
+            }); 
             // Establish the SDP connection
             localPeer.setSdpListener(remotePeer);
             remotePeer.setSdpListener(localPeer);
@@ -556,6 +595,18 @@ public class IcePeerTest {
             // Create a "remote" peer
             remotePeer = IceFactory.createIcePeer("remotePeer", true, remoteSockets);
 
+            localPeer.addEventListener(new IceEventListener() {
+                @Override
+                public void iceEvent(IceEvent event) {
+                    Logger.getLogger(getClass().getName()).log(Level.INFO,"Got event: {0} ({1})",new Object[] {event,event.getClass()});
+                }
+            }); 
+            remotePeer.addEventListener(new IceEventListener() {
+                @Override
+                public void iceEvent(IceEvent event) {
+                    Logger.getLogger(getClass().getName()).log(Level.INFO,"Got event: {0} ({1})",new Object[] {event,event.getClass()});
+                }
+            }); 
             // Establish the SDP connection
             localPeer.setSdpListener(remotePeer);
             remotePeer.setSdpListener(localPeer);
