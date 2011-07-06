@@ -2276,15 +2276,18 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
         SessionDescription session = factory.createSessionDescription();
 
-        session.setConnection(getDefaultConnection());
         // Add authorization attributes
         session.getAttributes(true).addAll(getGlobalAttributes());
         // Set the MediaDescriptions
         session.getMediaDescriptions(true).addAll(getMediaDescriptions());
+        // Connection needs to be calculated after the media descriptions
+        Connection connection = getDefaultConnection();
+        // Add origin
+        session.setOrigin(factory.createOrigin("-", hashCode(), new Date().getTime(), connection.getNetworkType(), connection.getAddressType(), connection.getAddress()));
+        // Set the connection
+        session.setConnection(connection);
 
         return session;
-
-
     }
 
     /**
