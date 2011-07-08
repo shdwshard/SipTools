@@ -50,7 +50,8 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
     @Inject
     Event<IceEvent> eventBroadcaster;
     protected final IceStateMachine peer;
-
+    private static final int MAX_QUEUE_SIZE = 64;
+    
     public IcePeer getPeer() {
         return peer;
     }
@@ -100,7 +101,7 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
         int position = bb.position();
         try {
             CandidatePair pair = peer.selectedPairs.get(iceSocket).get(component);
-            pair.localCandidate.socket.send(bb, pair.remoteCandidate.socketAddress);
+            pair.localCandidate.socket.send(bb, pair.getRemoteCandidate().getSocketAddress());
         } catch (NullPointerException ex) {
             log.log(Level.FINEST, "Socket not fully setup before write submitted.  Data is being lost", ex);
         }
@@ -164,6 +165,10 @@ class IceDatagramSocketChannel implements IceSocketChannel, StunEventListener {
             SocketAddress address = bytesEvent.getChannel().receive(buffer);
             if (address != null) {
                 queue.add(buffer);
+
+                while (queue.size() > MAX_QUEUE_SIZE) {
+                    log.log(Level.WARNING, "Discarding buffer {0} due to buffer overrun on socket channel {1}", new Object[] {queue.poll(),this});
+                }
                 fireEvent(new BytesAvailableEventImpl(this, peer));
             }
         }

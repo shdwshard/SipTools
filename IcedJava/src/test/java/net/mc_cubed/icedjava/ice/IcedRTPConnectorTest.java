@@ -31,9 +31,7 @@ import javax.sdp.Media;
 import javax.sdp.MediaDescription;
 import javax.sdp.SdpException;
 import javax.sdp.SdpFactory;
-import javax.sdp.SdpParseException;
 import javax.sdp.SessionDescription;
-import static org.junit.Assert.*;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -49,123 +47,6 @@ public class IcedRTPConnectorTest {
         Vector v = new Vector();
         v.add("26");
         MEDIA = SdpFactory.getInstance().createMedia("video", 0, 2, "RTP/AVP", v);
-    }
-
-    /**
-     * Test of removeTargets method, of class IcedRTPConnector.
-     */
-    @Test
-    public void testRemoveTargets() throws SocketException, SdpParseException {
-        System.out.println("removeTargets");
-        String reason = "Because this is a test";
-        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
-        instance.removeTargets(reason);
-    }
-
-    /**
-     * Test of getDataInputStream method, of class IcedRTPConnector.
-     */
-    @Test
-    public void testGetDataInputStream() throws Exception {
-        System.out.println("getDataInputStream");
-        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
-        PushSourceStream result = instance.getDataInputStream();
-        assertNotNull(result);
-    }
-
-    /**
-     * Test of getDataOutputStream method, of class IcedRTPConnector.
-     */
-    @Test
-    public void testGetDataOutputStream() throws Exception {
-        System.out.println("getDataOutputStream");
-        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
-        OutputDataStream result = instance.getDataOutputStream();
-        assertNotNull(result);
-    }
-
-    /**
-     * Test of getControlInputStream method, of class IcedRTPConnector.
-     */
-    @Test
-    public void testGetControlInputStream() throws Exception {
-        System.out.println("getControlInputStream");
-        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
-        PushSourceStream result = instance.getControlInputStream();
-        assertNotNull(result);
-    }
-
-    /**
-     * Test of getControlOutputStream method, of class IcedRTPConnector.
-     */
-    @Test
-    public void testGetControlOutputStream() throws Exception {
-        System.out.println("getControlOutputStream");
-        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
-        OutputDataStream result = instance.getControlOutputStream();
-        assertNotNull(result);
-    }
-
-    /**
-     * Test of getReceiveBufferSize method, of class IcedRTPConnector.
-     */
-    @Test
-    public void testGetReceiveBufferSize() throws SocketException, SdpParseException {
-        System.out.println("getReceiveBufferSize");
-        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
-        int expResult = -1;
-        int result = instance.getReceiveBufferSize();
-        assertEquals(expResult, result);
-    }
-
-    /**
-     * Test of setSendBufferSize method, of class IcedRTPConnector.
-     */
-    @Test
-    public void testSetSendBufferSize() throws Exception {
-        System.out.println("setSendBufferSize");
-        int arg0 = 1234;
-        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
-        instance.setSendBufferSize(arg0);
-    }
-
-    /**
-     * Test of getSendBufferSize method, of class IcedRTPConnector.
-     */
-    @Test
-    public void testGetSendBufferSize() throws SocketException, SdpParseException {
-        System.out.println("getSendBufferSize");
-        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
-        int expResult = -1;
-        int result = instance.getSendBufferSize();
-        assertEquals(expResult, result);
-    }
-
-    /**
-     * Test of getRTCPBandwidthFraction method, of class IcedRTPConnector.
-     */
-    @Test
-    public void testGetRTCPBandwidthFraction() throws SocketException, SdpParseException {
-        System.out.println("getRTCPBandwidthFraction");
-        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
-        double expResult = -1;
-        double result = instance.getRTCPBandwidthFraction();
-        // Does not specify, but leaves this to the RTPManager
-        assertEquals(expResult, result, 0);
-    }
-
-    /**
-     * Test of getRTCPSenderBandwidthFraction method, of class IcedRTPConnector.
-     */
-    @Test
-    public void testGetRTCPSenderBandwidthFraction() throws SocketException, SdpParseException {
-        System.out.println("getRTCPSenderBandwidthFraction");
-        IcedRTPConnector instance = new IcedRTPConnector(MEDIA);
-        double expResult = -1;
-        double result = instance.getRTCPSenderBandwidthFraction();
-
-        // Does not specify, but leaves this to the RTPManager
-        assertEquals(expResult, result, 0);
     }
 
     @Test
@@ -224,27 +105,27 @@ public class IcedRTPConnectorTest {
         Assert.assertEquals(2, localPeer.getNominated().size());
         Assert.assertEquals(2, remotePeer.getNominated().size());
         PushSourceStream[] pss = new PushSourceStream[]{
-            remoteSockets[0].getDataInputStream(),
-            remoteSockets[0].getControlInputStream(),
-            remoteSockets[1].getDataInputStream(),
-            remoteSockets[1].getControlInputStream(),
-            localSockets[0].getDataInputStream(),
-            localSockets[0].getControlInputStream(),
-            localSockets[1].getDataInputStream(),
-            localSockets[1].getControlInputStream()
+            remoteSockets[0].getBidirectionalConnector().getDataInputStream(),
+            remoteSockets[0].getBidirectionalConnector().getControlInputStream(),
+            remoteSockets[1].getBidirectionalConnector().getDataInputStream(),
+            remoteSockets[1].getBidirectionalConnector().getControlInputStream(),
+            localSockets[0].getBidirectionalConnector().getDataInputStream(),
+            localSockets[0].getBidirectionalConnector().getControlInputStream(),
+            localSockets[1].getBidirectionalConnector().getDataInputStream(),
+            localSockets[1].getBidirectionalConnector().getControlInputStream()
         };
 
 
 
         OutputDataStream[] ods = new OutputDataStream[]{
-            localSockets[0].getDataOutputStream(),
-            localSockets[0].getControlOutputStream(),
-            localSockets[1].getDataOutputStream(),
-            localSockets[1].getControlOutputStream(),
-            remoteSockets[0].getDataOutputStream(),
-            remoteSockets[0].getControlOutputStream(),
-            remoteSockets[1].getDataOutputStream(),
-            remoteSockets[1].getControlOutputStream()
+            localSockets[0].getBidirectionalConnector().getDataOutputStream(),
+            localSockets[0].getBidirectionalConnector().getControlOutputStream(),
+            localSockets[1].getBidirectionalConnector().getDataOutputStream(),
+            localSockets[1].getBidirectionalConnector().getControlOutputStream(),
+            remoteSockets[0].getBidirectionalConnector().getDataOutputStream(),
+            remoteSockets[0].getBidirectionalConnector().getControlOutputStream(),
+            remoteSockets[1].getBidirectionalConnector().getDataOutputStream(),
+            remoteSockets[1].getBidirectionalConnector().getControlOutputStream()
         };
 
         for (int i = 0; i < ods.length; i++) {
@@ -336,27 +217,38 @@ public class IcedRTPConnectorTest {
         Assert.assertNotSame("Ice MUST resolve a role conflict!", localPeer.isLocalControlled(), remotePeer.isLocalControlled());
 
         PushSourceStream[] pss = new PushSourceStream[]{
-            remoteSockets[0].getDataInputStream(),
-            remoteSockets[0].getControlInputStream(),
-            remoteSockets[1].getDataInputStream(),
-            remoteSockets[1].getControlInputStream(),
-            localSockets[0].getDataInputStream(),
-            localSockets[0].getControlInputStream(),
-            localSockets[1].getDataInputStream(),
-            localSockets[1].getControlInputStream()
+            remoteSockets[0].getBidirectionalConnector().getDataInputStream(),
+            remoteSockets[0].getBidirectionalConnector().getControlInputStream(),
+            remoteSockets[1].getBidirectionalConnector().getDataInputStream(),
+            remoteSockets[1].getBidirectionalConnector().getControlInputStream(),
+            localSockets[0].getBidirectionalConnector().getDataInputStream(),
+            localSockets[0].getBidirectionalConnector().getControlInputStream(),
+            localSockets[1].getBidirectionalConnector().getDataInputStream(),
+            localSockets[1].getBidirectionalConnector().getControlInputStream()
+        };
+
+        PushSourceStream[] pss2 = new PushSourceStream[]{
+            remoteSockets[0].getBidirectionalConnector().getDataInputStream(),
+            remoteSockets[0].getBidirectionalConnector().getControlInputStream(),
+            remoteSockets[1].getBidirectionalConnector().getDataInputStream(),
+            remoteSockets[1].getBidirectionalConnector().getControlInputStream(),
+            localSockets[0].getBidirectionalConnector().getDataInputStream(),
+            localSockets[0].getBidirectionalConnector().getControlInputStream(),
+            localSockets[1].getBidirectionalConnector().getDataInputStream(),
+            localSockets[1].getBidirectionalConnector().getControlInputStream()
         };
 
 
 
         OutputDataStream[] ods = new OutputDataStream[]{
-            localSockets[0].getDataOutputStream(),
-            localSockets[0].getControlOutputStream(),
-            localSockets[1].getDataOutputStream(),
-            localSockets[1].getControlOutputStream(),
-            remoteSockets[0].getDataOutputStream(),
-            remoteSockets[0].getControlOutputStream(),
-            remoteSockets[1].getDataOutputStream(),
-            remoteSockets[1].getControlOutputStream()
+            localSockets[0].getBidirectionalConnector().getDataOutputStream(),
+            localSockets[0].getBidirectionalConnector().getControlOutputStream(),
+            localSockets[1].getBidirectionalConnector().getDataOutputStream(),
+            localSockets[1].getBidirectionalConnector().getControlOutputStream(),
+            remoteSockets[0].getBidirectionalConnector().getDataOutputStream(),
+            remoteSockets[0].getBidirectionalConnector().getControlOutputStream(),
+            remoteSockets[1].getBidirectionalConnector().getDataOutputStream(),
+            remoteSockets[1].getBidirectionalConnector().getControlOutputStream()
         };
 
         for (int i = 0; i < ods.length; i++) {
@@ -371,7 +263,7 @@ public class IcedRTPConnectorTest {
             // Test for the presense of the data
 
             Arrays.fill(data, (byte) 0);
-            pss[i].read(data, 0, 8);
+            pss2[i].read(data, 0, 8);
             Assert.assertEquals("Expecting to see Testing" + i + " Over the line, but didn't see that!", "Testing" + i, new String(data, 0, 8));
         }
 
@@ -442,27 +334,27 @@ public class IcedRTPConnectorTest {
         Assert.assertEquals(2, remotePeer.getNominated().size());
 
         PushSourceStream[] pss = new PushSourceStream[]{
-            remoteSockets[0].getDataInputStream(),
-            remoteSockets[0].getControlInputStream(),
-            remoteSockets[1].getDataInputStream(),
-            remoteSockets[1].getControlInputStream(),
-            localSockets[0].getDataInputStream(),
-            localSockets[0].getControlInputStream(),
-            localSockets[1].getDataInputStream(),
-            localSockets[1].getControlInputStream()
+            remoteSockets[0].getBidirectionalConnector().getDataInputStream(),
+            remoteSockets[0].getBidirectionalConnector().getControlInputStream(),
+            remoteSockets[1].getBidirectionalConnector().getDataInputStream(),
+            remoteSockets[1].getBidirectionalConnector().getControlInputStream(),
+            localSockets[0].getBidirectionalConnector().getDataInputStream(),
+            localSockets[0].getBidirectionalConnector().getControlInputStream(),
+            localSockets[1].getBidirectionalConnector().getDataInputStream(),
+            localSockets[1].getBidirectionalConnector().getControlInputStream()
         };
 
 
 
         OutputDataStream[] ods = new OutputDataStream[]{
-            localSockets[0].getDataOutputStream(),
-            localSockets[0].getControlOutputStream(),
-            localSockets[1].getDataOutputStream(),
-            localSockets[1].getControlOutputStream(),
-            remoteSockets[0].getDataOutputStream(),
-            remoteSockets[0].getControlOutputStream(),
-            remoteSockets[1].getDataOutputStream(),
-            remoteSockets[1].getControlOutputStream()
+            localSockets[0].getBidirectionalConnector().getDataOutputStream(),
+            localSockets[0].getBidirectionalConnector().getControlOutputStream(),
+            localSockets[1].getBidirectionalConnector().getDataOutputStream(),
+            localSockets[1].getBidirectionalConnector().getControlOutputStream(),
+            remoteSockets[0].getBidirectionalConnector().getDataOutputStream(),
+            remoteSockets[0].getBidirectionalConnector().getControlOutputStream(),
+            remoteSockets[1].getBidirectionalConnector().getDataOutputStream(),
+            remoteSockets[1].getBidirectionalConnector().getControlOutputStream()
         };
 
         for (int i = 0; i < ods.length; i++) {
@@ -554,27 +446,27 @@ public class IcedRTPConnectorTest {
         Assert.assertNotSame("Ice MUST resolve a role conflict!", localPeer.isLocalControlled(), remotePeer.isLocalControlled());
 
         PushSourceStream[] pss = new PushSourceStream[]{
-            remoteSockets[0].getDataInputStream(),
-            remoteSockets[0].getControlInputStream(),
-            remoteSockets[1].getDataInputStream(),
-            remoteSockets[1].getControlInputStream(),
-            localSockets[0].getDataInputStream(),
-            localSockets[0].getControlInputStream(),
-            localSockets[1].getDataInputStream(),
-            localSockets[1].getControlInputStream()
+            remoteSockets[0].getBidirectionalConnector().getDataInputStream(),
+            remoteSockets[0].getBidirectionalConnector().getControlInputStream(),
+            remoteSockets[1].getBidirectionalConnector().getDataInputStream(),
+            remoteSockets[1].getBidirectionalConnector().getControlInputStream(),
+            localSockets[0].getBidirectionalConnector().getDataInputStream(),
+            localSockets[0].getBidirectionalConnector().getControlInputStream(),
+            localSockets[1].getBidirectionalConnector().getDataInputStream(),
+            localSockets[1].getBidirectionalConnector().getControlInputStream()
         };
 
 
 
         OutputDataStream[] ods = new OutputDataStream[]{
-            localSockets[0].getDataOutputStream(),
-            localSockets[0].getControlOutputStream(),
-            localSockets[1].getDataOutputStream(),
-            localSockets[1].getControlOutputStream(),
-            remoteSockets[0].getDataOutputStream(),
-            remoteSockets[0].getControlOutputStream(),
-            remoteSockets[1].getDataOutputStream(),
-            remoteSockets[1].getControlOutputStream()
+            localSockets[0].getBidirectionalConnector().getDataOutputStream(),
+            localSockets[0].getBidirectionalConnector().getControlOutputStream(),
+            localSockets[1].getBidirectionalConnector().getDataOutputStream(),
+            localSockets[1].getBidirectionalConnector().getControlOutputStream(),
+            remoteSockets[0].getBidirectionalConnector().getDataOutputStream(),
+            remoteSockets[0].getBidirectionalConnector().getControlOutputStream(),
+            remoteSockets[1].getBidirectionalConnector().getDataOutputStream(),
+            remoteSockets[1].getBidirectionalConnector().getControlOutputStream()
         };
 
         for (int i = 0; i < ods.length; i++) {

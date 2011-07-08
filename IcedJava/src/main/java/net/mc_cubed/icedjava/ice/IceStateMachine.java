@@ -164,6 +164,8 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     boolean sendKeepalives = false;
     private long lastRemoteVersion = 0;
     private Set<IceEventListener> iceEventListeners = new java.util.concurrent.CopyOnWriteArraySet<IceEventListener>();
+    private final Queue<SocketPair> nominationQueue = new LinkedList<SocketPair>();
+    private final Queue<SessionDescription> mediaUpdateQueue = new LinkedList<SessionDescription>();
 
     /**
      * IceEventListeners will receive asynchronous notification of IceEvents on
@@ -394,9 +396,36 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
             }
         }
     }
+
+    void checkNominations() {
+        synchronized (nominationQueue) {
+            if (!nominationQueue.isEmpty()) {
+                SocketPair pair = nominationQueue.peek();
+                if (this.setNominatedCandidate(pair.getLocalAddress(), pair.getRemoteAddress())) {
+                    nominationQueue.poll();
+                }
+            }
+        }
+    }
+
+    void checkSessionUpdates() {
+        if (!mediaUpdateQueue.isEmpty()) {
+            SessionDescription session = mediaUpdateQueue.poll();
+            try {
+                this._updateMedia(session.getOrigin(), session.getConnection(), session.getAttributes(false), session.getMediaDescriptions(false));
+            } catch (SdpParseException ex) {
+                Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (UnknownHostException ex) {
+                Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (SdpException ex) {
+                Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+    }
     /*
      * This method implements the ICE State machine.  It is called periodically
      */
+
     @Override
     public synchronized void run() {
         log.entering(getClass().getName(), "run");
@@ -407,7 +436,17 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
              * Refresh any port mappings in need of a refresh
              */
             doRefreshes();
-            
+
+            /**
+             * Check for any overdue nominations
+             */
+            checkNominations();
+
+            /**
+             * Check for session updates
+             */
+            checkSessionUpdates();
+
             if (iceStatus == IceStatus.IN_PROGRESS) {
                 // First check for any finished pairs
                 for (Entry<IceSocket, List<CandidatePair>> pairsEntry : checkPairs.entrySet()) {
@@ -531,21 +570,26 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
                                         for (List<CandidatePair> nominateOne : separatedCandidates.values()) {
                                             // Sort to get the highest priority pair on top
                                             Collections.sort(nominateOne, new CandidatePairComparison());
-                                            // Nominate the highest priority pair that succeeded
-                                            CandidatePair nominatePair = nominateOne.get(0);
+                                            // Nominate the highest priority pair that succeedes
+                                            for (CandidatePair nominatePair : nominateOne) {
 
-                                            nominate(nominatePair);
+                                                nominate(nominatePair);
+                                                // Send the nomination to the remote ICE peer
+                                                IceReply nominationReply = doIceTest(
+                                                        nominatePair,
+                                                        localUFrag,
+                                                        remoteUFrag,
+                                                        remotePassword,
+                                                        isLocalControlled(),
+                                                        PEER_REFLEXIVE_PRIORITY,
+                                                        tieBreaker,
+                                                        true).get();
 
-                                            // Send the nomination to the remote ICE peer
-                                            doIceTest(
-                                                    nominatePair,
-                                                    localUFrag,
-                                                    remoteUFrag,
-                                                    remotePassword,
-                                                    isLocalControlled(),
-                                                    PEER_REFLEXIVE_PRIORITY,
-                                                    tieBreaker,
-                                                    true);
+                                                if (nominationReply.isSuccess()) {
+                                                    nominate(nominatePair);
+                                                    break;
+                                                }
+                                            }
                                         }
                                         checkPairs.putAll(nominated);
                                     }
@@ -1126,9 +1170,12 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         // Check whether this is a nomination request, and we're the controlled peer
         if (attrMap.containsKey(AttributeType.USE_CANDIDATE) && !isLocalControlled()) {
             // Nominate this candidate with the peer
-            setNominatedCandidate(
+            if (!setNominatedCandidate(
                     (InetSocketAddress) ctx.getConnection().getLocalAddress(),
-                    (InetSocketAddress) sourceAddress);
+                    (InetSocketAddress) sourceAddress)) {
+                nominationQueue.add(new SocketPair((InetSocketAddress) ctx.getConnection().getLocalAddress(),
+                        (InetSocketAddress) sourceAddress));
+            }
         }
         remoteTouch(
                 (InetSocketAddress) ctx.getConnection().getLocalAddress(),
@@ -1179,7 +1226,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      * @param refresh refresh candidates if true, normal behavior if false
      * @return A list of LocalCandidates for the specified channel
      */
-    List<LocalCandidate> getLocalCandidates(IceSocket iceSocket, boolean refresh) {
+    synchronized List<LocalCandidate> getLocalCandidates(IceSocket iceSocket, boolean refresh) {
         if (!socketCandidateMap.containsKey(iceSocket) || refresh) {
             socketCandidateMap.put(iceSocket, collectCandidates(iceSocket));
         }
@@ -1401,33 +1448,29 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
     @Override
     public void updateMedia(final Origin origin, final Connection conn, final List<Attribute> iceAttributes, final List<MediaDescription> iceMedias)
             throws SdpParseException {
-        log.log(Level.FINE, "SDP Update to {0}\n{1}\n{2}", new Object[]{localUFrag, iceAttributes, iceMedias});
-        /**
-         * Special case - Received a Session Description before processing
-         * started. In this event, we are definitely the controlled peer, and
-         * should behave as such
-         */
-        if (this.getStatus() == IceStatus.NOT_STARTED) {
-            log.log(Level.FINE, "Received a session description before ICE "
-                    + "processing start. Switching to CONTROLLED role");
-            localRole = AgentRole.CONTROLLED;
-        }
-
-        getThreadpool().execute(new Runnable() {
-
-            @Override
-            public void run() {
-                try {
-                    _updateMedia(origin, conn, iceAttributes, iceMedias);
-                } catch (SdpException ex) {
-                    Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, null, ex);
-                } catch (UnknownHostException ex) {
-                    Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, null, ex);
-                } catch (Throwable ex) {
-                    Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, null, ex);
-                }
+        try {
+            log.log(Level.FINE, "SDP Update to {0}\n{1}\n{2}", new Object[]{localUFrag, iceAttributes, iceMedias});
+            /**
+             * Special case - Received a Session Description before processing
+             * started. In this event, we are definitely the controlled peer, and
+             * should behave as such
+             */
+            if (this.getStatus() == IceStatus.NOT_STARTED) {
+                log.log(Level.FINE, "Received a session description before ICE "
+                        + "processing start. Switching to CONTROLLED role");
+                localRole = AgentRole.CONTROLLED;
             }
-        });
+
+            SessionDescription session = sdpFactory.createSessionDescription();
+            session.setOrigin(origin);
+            session.setConnection(conn);
+            session.getAttributes(true).addAll(iceAttributes);
+            session.getMediaDescriptions(true).addAll(iceMedias);
+
+            mediaUpdateQueue.offer(session);
+        } catch (SdpException ex) {
+            Logger.getLogger(IceStateMachine.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     synchronized void _updateMedia(Origin origin, Connection conn, List<Attribute> iceAttributes, List<MediaDescription> iceMedias)
@@ -1443,8 +1486,8 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
 
             lastRemoteVersion = origin.getSessionVersion();
         } catch (NumberFormatException nfe) {
-            log.log(Level.WARNING,"Caught a number format exception reading the session version.\n"
-                    + "Disabling version checking, but this can cause loops.",nfe);
+            log.log(Level.WARNING, "Caught a number format exception reading the session version.\n"
+                    + "Disabling version checking, but this can cause loops.", nfe);
         }
         boolean uFragChanged = false, pwdChanged = false;
         String newRemoteUFrag = null, newRemotePassword = null;
@@ -2542,7 +2585,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
      * @param localSocket Local channel address to nominate
      * @param remoteSocket Remote channel address to nominate
      */
-    void setNominatedCandidate(InetSocketAddress localSocket, InetSocketAddress remoteSocket) {
+    boolean setNominatedCandidate(InetSocketAddress localSocket, InetSocketAddress remoteSocket) {
         //Set this target as the use case.
         // Check for an existing check pair
         CandidatePair pair = null;
@@ -2580,7 +2623,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         if (local == null) {
             // TODO: Unknown use candidate!
             log.log(Level.WARNING, "Request to nominate an unknown socket: {0} <-> {1}", new Object[]{localSocket, remoteSocket});
-
+            return false;
 
         } else {
             if (pair != null) {
@@ -2629,6 +2672,7 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         }
         checkStatus();
 
+        return true;
 
     }
 
@@ -2754,23 +2798,24 @@ abstract class IceStateMachine extends BaseFilter implements Runnable,
         return stunServer;
 
     }
-    Map<IceSocket, List<IceSocketChannel>> channels = new HashMap<IceSocket, List<IceSocketChannel>>();
+    final Map<IceSocket, List<IceSocketChannel>> channels = new HashMap<IceSocket, List<IceSocketChannel>>();
 
     @Override
     public List<IceSocketChannel> getChannels(final IceSocket socket) {
-        if (!channels.containsKey(socket)) {
-            LinkedList<IceSocketChannel> channelList = new LinkedList<IceSocketChannel>();
-            for (short component = (short) 0; component < socket.getComponents(); component++) {
-                channelList.add(new IceDatagramSocketChannel(this, socket, component));
+        synchronized (channels) {
+            if (!channels.containsKey(socket)) {
+                LinkedList<IceSocketChannel> channelList = new LinkedList<IceSocketChannel>();
+                for (short component = (short) 0; component < socket.getComponents(); component++) {
+                    channelList.add(new IceDatagramSocketChannel(this, socket, component));
+                }
+                List<LocalCandidate> localCandidates = getLocalCandidates(socket);
+                for (LocalCandidate candidate : localCandidates) {
+                    candidate.socket.setStunEventListener((IceDatagramSocketChannel) channelList.get(candidate.getComponentId()));
+                }
+                channels.put(socket, channelList);
             }
-            List<LocalCandidate> localCandidates = getLocalCandidates(socket);
-            for (LocalCandidate candidate : localCandidates) {
-                candidate.socket.setStunEventListener((IceDatagramSocketChannel) channelList.get(candidate.getComponentId()));
-            }
-            channels.put(socket, channelList);
+            return channels.get(socket);
         }
-
-        return channels.get(socket);
     }
 
     @Override

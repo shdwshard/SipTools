@@ -22,4 +22,8 @@
     <weld:exclude name="net.mc_cubed.icedjava.ice.IcedRTPConnector">
         <weld:if-class-available name="!javax.media.protocol.PushSourceStream"/>
     </weld:exclude>
+    <weld:exclude name="net.mc_cubed.icedjava.ice.IceRTPConnectorComponent">
+        <weld:if-class-available name="!javax.media.protocol.PushSourceStream"/>
+    </weld:exclude>
+    
 </beans>

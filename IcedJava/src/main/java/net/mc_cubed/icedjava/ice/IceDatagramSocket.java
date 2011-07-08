@@ -38,7 +38,6 @@ import javax.sdp.SdpParseException;
 import net.mc_cubed.icedjava.stun.TCPSocketType;
 import net.mc_cubed.icedjava.stun.TransportType;
 import net.mc_cubed.icedjava.util.ExpiringCache;
-import org.glassfish.grizzly.filterchain.BaseFilter;
 
 /**
  * The name is somewhat misleading since this class doesn't actually implement
@@ -52,7 +51,7 @@ import org.glassfish.grizzly.filterchain.BaseFilter;
  * @see IceStreamSocket
  * @see IceSocket
  */
-public class IceDatagramSocket extends BaseFilter implements IceSocket {
+public class IceDatagramSocket implements IceSocket {
 
     //private final InetSocketAddress stunServer;
     private Map<String, IcePeer> _peers = new HashMap<String, IcePeer>();

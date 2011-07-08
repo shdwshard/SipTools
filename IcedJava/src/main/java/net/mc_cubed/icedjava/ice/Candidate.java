@@ -40,9 +40,9 @@ import net.mc_cubed.icedjava.stun.TCPSocketType;
  */
 public abstract class Candidate {
 
-    protected Date lastKeepalive;
+    private Date lastKeepalive;
     protected Candidate base;
-    protected InetSocketAddress socketAddress;
+    private InetSocketAddress socketAddress;
     protected TCPSocketType socketType;
 
     public abstract String getFoundation();

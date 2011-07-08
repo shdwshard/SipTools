@@ -616,8 +616,8 @@ public class IcePeerTest {
             //  wait for a reply.
             localPeer.start();
 
-            Assert.assertEquals(IceStatus.IN_PROGRESS, localPeer.getStatus());
-            Assert.assertEquals(IceStatus.IN_PROGRESS, remotePeer.getStatus());
+            Assert.assertNotSame(IceStatus.NOT_STARTED, localPeer.getStatus());
+            Assert.assertNotSame(IceStatus.NOT_STARTED, remotePeer.getStatus());
 
 
             // Peek at the check pairs so we can see what ICE is actually doing during the test
@@ -639,8 +639,8 @@ public class IcePeerTest {
             // Wait for the threads to run a tiny bit
             Thread.sleep(100);
 
-            Assert.assertEquals(IceStatus.IN_PROGRESS, localPeer.getStatus());
-            Assert.assertEquals(IceStatus.IN_PROGRESS, remotePeer.getStatus());
+            Assert.assertNotSame(IceStatus.NOT_STARTED, localPeer.getStatus());
+            Assert.assertNotSame(IceStatus.NOT_STARTED, remotePeer.getStatus());
 
 
             long startTime = new Date().getTime();
